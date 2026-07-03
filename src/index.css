@@ -1,13 +1,180 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@import url('https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 7%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 7%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217 100% 69%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 19% 27%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 19% 27%;
+  --muted-foreground: 215 20% 77%;
+  --accent: 217 19% 27%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 19% 27%;
+  --input: 217 19% 27%;
+  --ring: 217 100% 69%;
+  --radius: 0.75rem;
+
+  --ot-bg-top: #010a25;
+  --ot-bg-mid: #021e3b;
+  --ot-bg-bottom: #01112c;
+  --ot-surface-top: #203250;
+  --ot-surface-bottom: #03132e;
+  --ot-surfacebutton-top: #425679;
+  --ot-surfacebutton-bottom: #03132e;
+  --ot-surface-elev-top: #234f7d;
+  --ot-surface-elev-bottom: #0e2e54;
+  --ot-action-top: #5fa6ff;
+  --ot-action-bottom: #3e80d5;
+  --ot-action-hover-top: #74b3ff;
+  --ot-action-hover-bottom: #4f91e4;
+  --ot-border: rgba(139, 175, 229, 0.35);
+  --ot-text-muted: #a7bedf;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+
+@layer base {
+  html {
+    min-height: 100%;
+    background: var(--ot-bg-top);
+  }
+
+  body {
+    @apply font-baijam text-white min-h-screen m-0;
+    background:
+      radial-gradient(circle at center, rgba(95, 166, 255, 0.22) 0%, rgba(35, 79, 125, 0.16) 22%, rgba(2, 30, 59, 0.08) 42%, transparent 62%),
+      linear-gradient(180deg, var(--ot-bg-top) 0%, var(--ot-bg-mid) 50%, var(--ot-bg-bottom) 100%);
+    background-attachment: fixed;
+    background-color: var(--ot-bg-top);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-ot-surface-top/40 border border-ot-border rounded-3xl overflow-hidden backdrop-blur-md;
+    background: linear-gradient(135deg, rgba(32, 50, 80, 0.4), rgba(3, 19, 46, 0.6));
+  }
+
+  .action-button {
+    @apply relative overflow-hidden rounded-full transition-all duration-300 active:scale-95 flex items-center justify-center;
+    background: linear-gradient(to bottom, var(--ot-action-top), var(--ot-action-bottom));
+  }
+
+  .action-button:hover {
+    background: linear-gradient(to bottom, var(--ot-action-hover-top), var(--ot-action-hover-bottom));
+    box-shadow: 0 0 20px rgba(95, 166, 255, 0.4);
+  }
+
+  .surface-button {
+    @apply relative overflow-hidden rounded-full transition-all duration-300 flex items-center justify-center;
+    background: linear-gradient(to bottom, var(--ot-surfacebutton-top), var(--ot-surfacebutton-bottom));
+    border: 1px solid var(--ot-border);
+  }
+
+  .surface-button:hover {
+    @apply border-white/40;
+    box-shadow: 0 0 15px rgba(66, 86, 121, 0.3);
+  }
+
+  .elevated-card {
+    @apply rounded-2xl border border-ot-border;
+    background: linear-gradient(to bottom, var(--ot-surface-elev-top), var(--ot-surface-elev-bottom));
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin 8s linear infinite;
+  }
+
+  .bg-gradient-radial {
+    background-image: radial-gradient(var(--tw-gradient-stops));
+  }
+
+  .instance-count-badge {
+    @apply inline-flex h-7 min-w-[74px] items-center justify-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 text-[10px] font-black text-white/80 transition-all duration-300;
+  }
+
+  .instance-count-loading {
+    @apply border-ot-action-top/60 bg-ot-action-top/20 text-white shadow-lg shadow-ot-action-top/30;
+  }
+
+  .instance-bulge-row {
+    position: relative;
+    z-index: 2;
+    animation: instance-bulge 0.9s ease-in-out infinite;
+    background:
+      linear-gradient(90deg, rgba(95, 166, 255, 0.28), rgba(255, 255, 255, 0.13), rgba(95, 166, 255, 0.18));
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    box-shadow:
+      0 18px 38px rgba(0, 0, 0, 0.32),
+      0 0 36px rgba(95, 166, 255, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 0 34px rgba(255, 255, 255, 0.08);
+  }
+
+  .animate-gradient-x {
+    background-size: 200% 200%;
+    animation: gradient-x 3s ease infinite;
+  }
+}
+
+@keyframes gradient-x {
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes instance-bulge {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.045);
+  }
+}
+
+/* Base scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ot-surface-top);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ot-surfacebutton-top);
 }
