@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { resolveDicomPlaceholders } from './CDDesignStudio';
 import { Copy, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 
-const CD_SIZE = 360;       // px — outer diameter on canvas
+const CD_SIZE = 360;      
 
 function CDCanvas({
     elements, selectedIds, onSelect, onUpdateElements,
@@ -11,11 +11,11 @@ function CDCanvas({
 }) {
     const workspaceRef = useRef(null);
     const canvasRef = useRef(null);
-    const [dragging, setDragging] = useState(null); // { id, startX, startY, origX, origY }
+    const [dragging, setDragging] = useState(null);
     const [resizing, setResizing] = useState(null);
     const [rotating, setRotating] = useState(null);
     // New state for rotating text path directly
-    const [arcRotating, setArcRotating] = useState(null); // { id, startAngle, origAngle }
+    const [arcRotating, setArcRotating] = useState(null); 
 
     const [contextMenu, setContextMenu] = useState(null);
     const [alignGuides, setAlignGuides] = useState([]);
