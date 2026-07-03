@@ -122,9 +122,7 @@ function MultiSelectCompression({ selected = [], onChange }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// LocalDicomSettings
-// ---------------------------------------------------------------------------
+
 function LocalDicomSettings({ formData, onChange }) {
   // Parse compression: stored as comma-separated string or array
   const compressionValue = formData.compression || '';
