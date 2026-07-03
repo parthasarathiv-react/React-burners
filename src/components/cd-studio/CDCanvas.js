@@ -14,7 +14,6 @@ function CDCanvas({
     const [dragging, setDragging] = useState(null);
     const [resizing, setResizing] = useState(null);
     const [rotating, setRotating] = useState(null);
-    // New state for rotating text path directly
     const [arcRotating, setArcRotating] = useState(null); 
 
     const [contextMenu, setContextMenu] = useState(null);
@@ -26,11 +25,9 @@ function CDCanvas({
     const CENTER_X = CD_SIZE / 2;
     const CENTER_Y = CD_SIZE / 2;
 
-    // Map mm to px relative to the outer edge
     const pxPerMm = (CD_SIZE / 2) / (discConfig?.outerRadius || 60);
     const hubR = (discConfig?.innerRadius || 11) * pxPerMm;
 
-    // Sort by zIndex for rendering
     const sortedElements = [...elements].sort((a, b) => a.zIndex - b.zIndex);
 
     const getCanvasPoint = useCallback((clientX, clientY) => {
