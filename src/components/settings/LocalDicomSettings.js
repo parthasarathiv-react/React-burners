@@ -11,12 +11,7 @@ const COMPRESSION_OPTIONS = [
   { label: 'RLE Lossless', value: 'RLE Lossless' },
 ];
 
-// ---------------------------------------------------------------------------
-// MultiSelectCompression – custom dropdown with checkboxes + Select All
-// Props:
-//   selected  : string[]  – currently selected values
-//   onChange  : (string[]) => void
-// ---------------------------------------------------------------------------
+
 function MultiSelectCompression({ selected = [], onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
