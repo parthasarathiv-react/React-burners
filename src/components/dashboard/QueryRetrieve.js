@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, RotateCcw, Download, Activity, Filter, Clock, Calendar } from 'lucide-react';
+import { Search, RotateCcw, Download, Filter, Clock, Calendar, Loader2 } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -21,6 +21,7 @@ import {
 } from "../ui/table";
 
 import api from '../../lib/api';
+import { useDownload } from '../../context/DownloadContext';
 const MODALITIES = [
     { label: 'Select Modality', value: '' },
     { label: 'CR', value: 'CR' },
@@ -57,13 +58,15 @@ function formatTime(raw) {
     return raw;
 }
 
-function QueryRetrieve({ onRetrieve }) {
+function QueryRetrieve() {
     const [results, setResults] = useState(null); // null = not searched yet
     const [searching, setSearching] = useState(false);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState('5');
     const [filters, setFilters] = useState(EMPTY_FILTERS);
+
+    const { startDownload, downloadStates } = useDownload();
 
     const handleFilterChange = (field, value) => {
         setFilters(prev => ({ ...prev, [field]: value }));
@@ -382,7 +385,7 @@ function QueryRetrieve({ onRetrieve }) {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => onRetrieve && onRetrieve(study)}
+                                                onClick={() => startDownload(study)}
                                             >
                                                 <Download size={12} className="mr-1.5" /> Retrieve
                                             </Button>

@@ -9,11 +9,13 @@ import BottomStatus from './BottomStatus';
 import SettingsModal from './SettingsModal';
 import QueryRetrieve from './QueryRetrieve';
 import { Tabs, TabsContent } from '../ui/tabs';
-import { getStudies, getSettings, addStudy, saveSettings } from '../../lib/dataManager';
+import { getSettings, saveSettings } from '../../lib/dataManager';
 import { useAuth } from '../../context/AuthContext';
+import { DownloadProvider } from '../../context/DownloadContext';
 import { Flame, Disc, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import CDPreview from '../cd-studio/CDPreview';
+import api from '../../lib/api';
 
 function Dashboard({ theme, onThemeChange }) {
   const { loading: authLoading } = useAuth();
@@ -78,15 +80,57 @@ function Dashboard({ theme, onThemeChange }) {
     modality: ''
   });
 
-  useEffect(() => {
-    const loadedStudies = getStudies();
-    const loadedSettings = getSettings();
-    setStudies(loadedStudies);
-    setSettings(loadedSettings);
-    setLoading(false);
+  const fetchLocalStudies = useCallback(async () => {
+    try {
+      const response = await api.get('/localstudies');
+      const data = response.data;
+      if (Array.isArray(data)) {
+        const mapped = data.map(s => ({
+          id: s.id,
+          studyInstanceUid: s.studyInstanceUid,
+          patientName: s.patient?.patientName || '—',
+          patientId: s.patient?.patientId || '—',
+          accession: s.accessionNumber || '—',
+          studyDate: s.studyDate || '—',
+          modality: s.modality || '—',
+          instance: s.totalInstances || s.downloadedInstances || 0,
+          description: s.studyDescription || '—',
+          status: s.status, // 0 = Pending, 1 = Downloading, 2 = Completed, 3 = Failed
+          downloadedInstances: s.downloadedInstances,
+          totalInstances: s.totalInstances,
+          localFolderPath: s.localFolderPath,
+          completedAt: s.completedAt,
+          errorMessage: s.errorMessage,
+        }));
+        setStudies(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch local studies:', err);
+      toast.error('Failed to load local studies from server.');
+    }
   }, []);
 
-  const handleUpdateStudies = (newStudies) => setStudies(newStudies);
+  useEffect(() => {
+    const loadedSettings = getSettings();
+    setSettings(loadedSettings);
+    fetchLocalStudies().finally(() => setLoading(false));
+  }, [fetchLocalStudies]);
+
+  const handleDeleteStudy = useCallback(async (id) => {
+    if (window.confirm('Are you sure you want to delete this study?')) {
+      try {
+        await api.delete(`/localstudies/${id}`);
+        toast.success('Study deleted successfully.');
+        fetchLocalStudies();
+      } catch (err) {
+        console.error('Failed to delete study on backend:', err);
+        // Fallback to local deletion from state if backend fails or doesn't support delete
+        setStudies(prev => prev.filter(s => s.id !== id));
+        toast.info('Study removed from local view.');
+      }
+    }
+  }, [fetchLocalStudies]);
+
   const handleUpdateSettings = (newSettings) => {
     saveSettings(newSettings);
     setSettings(newSettings);
@@ -121,14 +165,70 @@ function Dashboard({ theme, onThemeChange }) {
     }
   };
 
-  const handleRetrieve = (remoteStudy) => {
-    const retrievedStudy = { ...remoteStudy, id: `retrieved_${Date.now()}` };
-    const updated = addStudy(retrievedStudy);
-    setStudies(updated);
-    setIncomingStudyId(retrievedStudy.id);
+  /**
+   * Called by DownloadContext IMMEDIATELY when Retrieve is clicked.
+   * Adds a placeholder study row to the table and navigates to the Studies tab
+   * so the user sees the downloading progress in real time.
+   */
+  const handleDownloadStarted = useCallback((study) => {
+    const uid = study.studyInstanceUid;
+    const placeholder = {
+      ...study,
+      id: `dl_${uid}`,
+      // Normalize field names to match StudyTable expectations
+      instance: study.numberOfStudyRelatedInstances ?? 0,
+      accession: study.accessionNumber || study.accession || '',
+      description: study.studyDescription || study.description || '',
+    };
+    setStudies((prev) => {
+      // Avoid adding a duplicate if the study is already present
+      if (prev.some((s) => s.studyInstanceUid === uid)) return prev;
+      return [placeholder, ...prev];
+    });
     setCurrentPage(1);
     setActiveTab('Studies');
-  };
+  }, []);
+
+  const handleStudyReady = useCallback(async (study, studyUid) => {
+    // Remove the downloading placeholder first
+    setStudies((prev) => prev.filter((s) => s.id !== `dl_${studyUid}`));
+
+    try {
+      const response = await api.get('/localstudies');
+      const data = response.data;
+      if (Array.isArray(data)) {
+        const mapped = data.map(s => ({
+          id: s.id,
+          studyInstanceUid: s.studyInstanceUid,
+          patientName: s.patient?.patientName || '—',
+          patientId: s.patient?.patientId || '—',
+          accession: s.accessionNumber || '—',
+          studyDate: s.studyDate || '—',
+          modality: s.modality || '—',
+          instance: s.totalInstances || s.downloadedInstances || 0,
+          description: s.studyDescription || '—',
+          status: s.status, // 0 = Pending, 1 = Downloading, 2 = Completed, 3 = Failed
+          downloadedInstances: s.downloadedInstances,
+          totalInstances: s.totalInstances,
+          localFolderPath: s.localFolderPath,
+          completedAt: s.completedAt,
+          errorMessage: s.errorMessage,
+        }));
+        setStudies(mapped);
+
+        // Find the matching study to trigger the count-up animation
+        const matched = mapped.find(s => s.studyInstanceUid === studyUid);
+        if (matched) {
+          setIncomingStudyId(matched.id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to refetch studies after completion:', err);
+    }
+
+    setCurrentPage(1);
+    setActiveTab('Studies');
+  }, []);
 
   const filteredStudies = useMemo(() => {
     return studies.filter(s => {
@@ -158,7 +258,14 @@ function Dashboard({ theme, onThemeChange }) {
   //   );
   // }
 
+  useEffect(() => {
+    if (activeTab === 'Studies') {
+      fetchLocalStudies();
+    }
+  }, [activeTab, fetchLocalStudies]);
+
   return (
+    <DownloadProvider onStudyReady={handleStudyReady} onDownloadStarted={handleDownloadStarted}>
     <Tabs
       value={activeTab}
       onValueChange={setActiveTab}
@@ -191,7 +298,8 @@ function Dashboard({ theme, onThemeChange }) {
             <div ref={tableContainerRef} className="flex-1 flex flex-col rounded-t-2xl relative z-10 min-h-0">
               <StudyTable
                 studies={paginatedStudies}
-                onUpdate={handleUpdateStudies}
+                onUpdate={setStudies}
+                onDelete={handleDeleteStudy}
                 incomingStudyId={incomingStudyId}
                 onIncomingComplete={handleIncomingComplete}
                 selectedIds={selectedStudyIds}
@@ -227,7 +335,7 @@ function Dashboard({ theme, onThemeChange }) {
           value="Query/Retrieve"
           className="flex-1 p-6 overflow-hidden data-[state=active]:flex data-[state=inactive]:hidden flex-col"
         >
-          <QueryRetrieve onRetrieve={handleRetrieve} />
+          <QueryRetrieve />
         </TabsContent>
 
         {/* Job Queue Tab */}
@@ -350,6 +458,7 @@ function Dashboard({ theme, onThemeChange }) {
         </div>
       )}
     </Tabs>
+    </DownloadProvider>
   );
 }
 

@@ -254,7 +254,6 @@ function CDDesignStudio({ onBack }) {
     const [history, setHistory] = useState([DEFAULT_ELEMENTS]);
     const [historyIndex, setHistoryIndex] = useState(0);
     const [zoom, setZoom] = useState(() => {
-        // 200% at 1920px width; scale linearly for other resolutions
         const baseZoom = (window.innerWidth / 1920) * 2;
         return Math.min(3, Math.max(0.25, Math.round(baseZoom * 100) / 100));
     });

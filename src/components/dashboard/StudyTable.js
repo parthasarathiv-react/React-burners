@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Eye, Trash2, MoreVertical, Loader2 } from 'lucide-react';
+import { Eye, Trash2, MoreVertical, Loader2, CheckCircle2, AlertCircle, Download } from 'lucide-react';
 import { deleteStudy } from '../../lib/dataManager';
+import { useDownload } from '../../context/DownloadContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +10,9 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 
-function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, selectedIds = [], onSelectChange }) {
+function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, selectedIds = [], onSelectChange, onDelete }) {
   const [instanceCounts, setInstanceCounts] = useState({});
+  const { downloadStates } = useDownload();
 
   const toggleSelectAll = () => {
     if (selectedIds.length === studies.length) {
@@ -38,7 +40,9 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this study?')) {
+    if (onDelete) {
+      onDelete(id);
+    } else if (window.confirm('Are you sure you want to delete this study?')) {
       const updated = deleteStudy(id);
       onUpdate(updated);
     }
@@ -108,13 +112,14 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
             <th className="py-2.5 px-3 text-[10px] md:text-xs font-bold text-ot-text-muted uppercase tracking-widest border-b border-ot-border/50">Modality</th>
             <th className="py-2.5 px-3 text-[10px] md:text-xs font-bold text-ot-text-muted uppercase tracking-widest border-b border-ot-border/50 text-center whitespace-nowrap">Instances</th>
             <th className="py-2.5 px-3 text-[10px] md:text-xs font-bold text-ot-text-muted uppercase tracking-widest border-b border-ot-border/50">Description</th>
+            <th className="py-2.5 px-3 text-[10px] md:text-xs font-bold text-ot-text-muted uppercase tracking-widest border-b border-ot-border/50 text-center">Status</th>
             <th className="py-2.5 px-3 text-[10px] md:text-xs font-bold text-ot-text-muted uppercase tracking-widest border-b border-ot-border/50 text-center">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y ">
           {studies.length === 0 ? (
             <tr>
-              <td colSpan="9" className="p-20 text-center text-ot-text-muted font-bold uppercase tracking-widest opacity-50">Archive Data Not Found</td>
+              <td colSpan="10" className="p-20 text-center text-ot-text-muted font-bold uppercase tracking-widest opacity-50">Archive Data Not Found</td>
             </tr>
           ) : (
             studies.map((row) => {
@@ -122,14 +127,28 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
               const isSelected = selectedIds.includes(row.id);
               const visibleInstances = isIncoming ? instanceCounts[row.id] ?? 0 : row.instance;
 
+              // Check if this study has an active download state via studyInstanceUid
+              const uid = row.studyInstanceUid;
+              const dlState = uid ? downloadStates[uid] : null;
+              const statusLower = String(row.status || '').toLowerCase();
+              const isDownloading = dlState?.status === 'downloading' || statusLower === 'downloading' || row.status === 1;
+              const isCompleted = dlState?.status === 'completed' || statusLower === 'completed' || row.status === 2;
+              const isFailed = dlState?.status === 'failed' || statusLower === 'failed' || row.status === 3;
+
+              // Progress percentage (guard division by zero)
+              const progressPct = dlState
+                ? (dlState.total > 0 ? Math.round((dlState.downloaded / dlState.total) * 100) : 0)
+                : (row.totalInstances > 0 ? Math.round(((row.downloadedInstances || 0) / row.totalInstances) * 100) : 0);
+
               return (
                 <tr
                   key={row.id}
                   onClick={() => handleRowClick(row.id)}
-                  className={`group hover:bg-white/[0.04] transition-all cursor-pointer border-l-4 ${isSelected ? 'border-ot-action-top bg-ot-action-top/5' : 'border-transparent'} ${isIncoming
-                    ? 'instance-bulge-row border-ot-action-top'
-                    : ''
-                    }`}
+                  className={`group hover:bg-white/[0.04] transition-all cursor-pointer border-l-4
+                    ${isSelected ? 'border-ot-action-top bg-ot-action-top/5' : 'border-transparent'}
+                    ${isIncoming ? 'instance-bulge-row border-ot-action-top' : ''}
+                    ${isCompleted ? 'border-emerald-500/60' : ''}
+                    ${isFailed ? 'border-red-500/60 bg-red-500/5' : ''}`}
                 >
                   <td className="py-2.5 px-3">
                     <input
@@ -152,11 +171,51 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     <span className={`instance-count-badge ${isIncoming ? 'instance-count-loading' : ''}`}>
-                      {isIncoming && <Loader2 size={12} className="animate-spin" />}
-                      {visibleInstances} IMG
+                      {(isIncoming || isDownloading) && <Loader2 size={12} className="animate-spin" />}
+                      {isDownloading
+                        ? (dlState?.total > 0
+                          ? `${dlState.downloaded} / ${dlState.total} IMG`
+                          : `${row.downloadedInstances || 0} / ${row.totalInstances || 0} IMG`)
+                        : `${visibleInstances} IMG`}
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-ot-text-muted text-xs md:text-sm truncate max-w-[150px] md:max-w-[200px]">{row.description}</td>
+
+                  {/* Status column */}
+                  <td className="py-2.5 px-3 text-center min-w-[120px]">
+                    {isDownloading ? (
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <Download size={11} className="text-ot-action-top animate-bounce" />
+                          <span className="text-[10px] font-bold text-ot-action-top uppercase tracking-widest">
+                            {progressPct}%
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-ot-action-top to-blue-400 rounded-full transition-all duration-500 relative"
+                            style={{ width: `${progressPct}%` }}
+                          >
+                            <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : isCompleted ? (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Completed</span>
+                      </div>
+                    ) : isFailed ? (
+                      <div className="flex items-center justify-center gap-1.5" title={dlState?.error || row.errorMessage || 'Download failed'}>
+                        <AlertCircle size={14} className="text-red-400" />
+                        <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Failed</span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-ot-text-muted/40 font-bold uppercase tracking-widest">—</span>
+                    )}
+                  </td>
+
                   <td className="py-2.5 px-3">
                     <div className="flex items-center justify-center gap-1">
                       <DropdownMenu>
