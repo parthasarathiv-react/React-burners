@@ -5,30 +5,34 @@ import CDElementsSidebar from './CDElementsSidebar';
 import CDCanvas from './CDCanvas';
 import CDPropertiesSidebar from './CDPropertiesSidebar';
 import CDLayersPanel from './CDLayersPanel';
+import {
+    getTemplates,
+    createTemplate,
+    updateTemplate,
+    deleteTemplate,
+} from '../../utils/templateApi';
 import './CDDesignStudio.css';
 
+// ─── DICOM Preview Data (sample values shown in designer) ────────────────────
 const SAMPLE_DICOM = {
-    patientName: 'John Doe',
-    patientId: 'PID-123456',
-    studyDate: '18-Jun-2026',
-    studyTime: '09:42:31',
-    modality: 'CT',
-    accessionNumber: 'ACC-789012',
-    hospitalName: 'ABC Medical Center',
-    referringDoctor: 'Dr. Sarah Johnson',
-    studyDescription: 'CT Chest with Contrast',
+    PatientName: 'John Doe',
+    PatientId: 'PID-123456',
+    StudyDate: '18-Jun-2026',
+    Modality: 'CT',
+    AccessionNumber: 'ACC-789012',
+    StudyDescription: 'CT Chest with Contrast',
+    StudyInstanceUID: '1.2.840.10008.5.1.4.1.1.2',
 };
 
+// ─── Placeholder map: spec keys → sample values ───────────────────────────────
 const DICOM_PLACEHOLDER_MAP = {
-    '{{patientName}}': 'patientName',
-    '{{patientId}}': 'patientId',
-    '{{studyDate}}': 'studyDate',
-    '{{studyTime}}': 'studyTime',
-    '{{modality}}': 'modality',
-    '{{accessionNumber}}': 'accessionNumber',
-    '{{hospitalName}}': 'hospitalName',
-    '{{referringDoctor}}': 'referringDoctor',
-    '{{studyDescription}}': 'studyDescription',
+    '{{PatientName}}': 'PatientName',
+    '{{PatientId}}': 'PatientId',
+    '{{StudyDate}}': 'StudyDate',
+    '{{Modality}}': 'Modality',
+    '{{AccessionNumber}}': 'AccessionNumber',
+    '{{StudyDescription}}': 'StudyDescription',
+    '{{StudyInstanceUID}}': 'StudyInstanceUID',
 };
 
 export function resolveDicomPlaceholders(text, dicomData) {
@@ -40,231 +44,176 @@ export function resolveDicomPlaceholders(text, dicomData) {
     return resolved;
 }
 
+export { SAMPLE_DICOM, DICOM_PLACEHOLDER_MAP };
+
+// ─── Canvas / CD dimensions (frontend display units) ─────────────────────────
+// The spec defines 1200×1200 px, but we render at 360 px (scaled by zoom).
+// When serializing to the backend, we use the 1200-based coordinate space.
+const DISPLAY_SIZE = 360;
+const SPEC_SIZE = 1200;
+const SCALE = SPEC_SIZE / DISPLAY_SIZE; // 3.333…
+
 let nextId = 100;
 function genId() { return `el-${nextId++}`; }
-
-const CD_TEMPLATE_STORAGE_KEY = 'raster_cd_label_templates';
-const BLANK_TEMPLATE_ID = 'blank';
-
-const DEFAULT_ELEMENTS = [];
-
-const SAMPLE_LABEL_ELEMENTS = [
-    {
-        id: 'bg-1',
-        type: 'rectangle',
-        name: 'Background',
-        x: 0, y: 0,
-        width: 360, height: 360,
-        rotation: 0,
-        opacity: 1,
-        fill: '#ffffff',
-        stroke: 'none',
-        strokeWidth: 0,
-        borderRadius: 180,
-        locked: false,
-        visible: true,
-        zIndex: 0,
-    },
-    {
-        id: 'text-hospital',
-        type: 'dynamic',
-        name: 'Hospital Name',
-        x: 180, y: 85,
-        width: 260,
-        rotation: 0,
-        opacity: 1,
-        content: '{{hospitalName}}',
-        fontFamily: 'Bai Jamjuree',
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#1a73e8',
-        textAlign: 'center',
-        letterSpacing: 2,
-        lineHeight: 1.4,
-        locked: false,
-        visible: true,
-        zIndex: 2,
-    },
-    {
-        id: 'divider-1',
-        type: 'line',
-        name: 'Top Divider',
-        x: 100, y: 105,
-        width: 160, height: 1,
-        rotation: 0,
-        opacity: 0.5,
-        fill: '#5fa6ff',
-        locked: false,
-        visible: true,
-        zIndex: 3,
-    },
-    {
-        id: 'text-patient',
-        type: 'dynamic',
-        name: 'Patient Name',
-        x: 180, y: 135,
-        width: 260,
-        rotation: 0,
-        opacity: 1,
-        content: '{{patientName}}',
-        fontFamily: 'Bai Jamjuree',
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#111111',
-        textAlign: 'center',
-        letterSpacing: 0.5,
-        lineHeight: 1.4,
-        locked: false,
-        visible: true,
-        zIndex: 4,
-    },
-    {
-        id: 'text-pid',
-        type: 'dynamic',
-        name: 'Patient ID',
-        x: 180, y: 158,
-        width: 260,
-        rotation: 0,
-        opacity: 0.7,
-        content: 'ID: {{patientId}}',
-        fontFamily: 'Bai Jamjuree',
-        fontSize: 10,
-        fontWeight: '500',
-        color: '#555555',
-        textAlign: 'center',
-        letterSpacing: 1,
-        lineHeight: 1.4,
-        locked: false,
-        visible: true,
-        zIndex: 5,
-    },
-    {
-        id: 'text-modality',
-        type: 'dynamic',
-        name: 'Modality Badge',
-        x: 180, y: 195,
-        width: 260,
-        rotation: 0,
-        opacity: 1,
-        content: '{{modality}} • {{studyDate}}',
-        fontFamily: 'Bai Jamjuree',
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#1a73e8',
-        textAlign: 'center',
-        letterSpacing: 1.5,
-        lineHeight: 1.4,
-        locked: false,
-        visible: true,
-        zIndex: 6,
-    },
-    {
-        id: 'divider-2',
-        type: 'line',
-        name: 'Bottom Divider',
-        x: 100, y: 218,
-        width: 160, height: 1,
-        rotation: 0,
-        opacity: 0.3,
-        fill: '#aaaaaa',
-        locked: false,
-        visible: true,
-        zIndex: 7,
-    },
-    {
-        id: 'text-desc',
-        type: 'dynamic',
-        name: 'Study Description',
-        x: 180, y: 238,
-        width: 240,
-        rotation: 0,
-        opacity: 0.8,
-        content: '{{studyDescription}}',
-        fontFamily: 'Bai Jamjuree',
-        fontSize: 10,
-        fontWeight: '400',
-        color: '#555555',
-        textAlign: 'center',
-        letterSpacing: 0.5,
-        lineHeight: 1.4,
-        locked: false,
-        visible: true,
-        zIndex: 8,
-    },
-    {
-        id: 'text-doc',
-        type: 'dynamic',
-        name: 'Referring Doctor',
-        x: 180, y: 265,
-        width: 240,
-        rotation: 0,
-        opacity: 0.7,
-        content: 'Ref: {{referringDoctor}}',
-        fontFamily: 'Bai Jamjuree',
-        fontSize: 9,
-        fontWeight: '400',
-        color: '#555555',
-        textAlign: 'center',
-        letterSpacing: 0.3,
-        lineHeight: 1.4,
-        locked: false,
-        visible: true,
-        zIndex: 9,
-    },
-];
-
-const BUILT_IN_TEMPLATES = [
-    { id: BLANK_TEMPLATE_ID, name: 'Blank Label', elements: DEFAULT_ELEMENTS, isDefault: true },
-    { id: 'sample-label', name: 'Sample Label Template', elements: SAMPLE_LABEL_ELEMENTS, isDefault: true },
-];
-
-function cloneElements(elements) {
-    return elements.map(element => ({ ...element }));
-}
-
-function loadStoredTemplates() {
-    try {
-        const saved = localStorage.getItem(CD_TEMPLATE_STORAGE_KEY);
-        if (!saved) return [];
-        const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
-}
-
-function saveStoredTemplates(templates) {
-    const userTemplates = templates.filter(template => !template.isDefault);
-    localStorage.setItem(CD_TEMPLATE_STORAGE_KEY, JSON.stringify(userTemplates));
-}
 
 const DEFAULT_DISC_CONFIG = {
     outerRadius: 60,
     printableRadius: 58,
     safeRadius: 56,
-    innerRadius: 11
+    innerRadius: 11,
 };
 
-export { SAMPLE_DICOM, DICOM_PLACEHOLDER_MAP };
+// ─── Schema converters ────────────────────────────────────────────────────────
+
+/**
+ * Convert a backend object (1200-px space, spec schema) → frontend element
+ */
+function specToElement(obj) {
+    if (obj.type === 'image') {
+        return {
+            id: String(obj.id),
+            type: 'image',
+            subtype: (obj.left === 0 && obj.top === 0 && obj.width === SPEC_SIZE) ? 'background' : 'custom',
+            name: obj.subtype || (obj.left === 0 && obj.top === 0 ? 'Background Image' : 'Image'),
+            x: Math.round(obj.left / SCALE),
+            y: Math.round(obj.top / SCALE),
+            width: Math.round(obj.width / SCALE),
+            height: Math.round(obj.height / SCALE),
+            src: obj.source || '',         // relative path — shown as URL in canvas
+            source: obj.source || '',
+            rotation: 0,
+            opacity: 1,
+            locked: false,
+            visible: true,
+            zIndex: obj.zIndex ?? 0,
+            objectFit: obj.left === 0 && obj.top === 0 ? 'fill' : 'contain',
+        };
+    }
+
+    // text / dynamic
+    return {
+        id: String(obj.id),
+        type: 'dynamic',
+        name: obj.name || 'Text',
+        x: Math.round(obj.left / SCALE),
+        y: Math.round(obj.top / SCALE),
+        width: Math.round((obj.width || 400) / SCALE),
+        rotation: 0,
+        opacity: 1,
+        content: obj.text || '',
+        fontFamily: obj.fontFamily || 'Arial',
+        fontSize: Math.round((obj.fontSize || 28) / SCALE),
+        fontWeight: obj.bold ? '700' : '400',
+        fontStyle: obj.italic ? 'italic' : 'normal',
+        color: obj.color || '#000000',
+        textAlign: obj.align || 'left',
+        letterSpacing: 0,
+        lineHeight: 1.4,
+        locked: false,
+        visible: true,
+        zIndex: obj.zIndex ?? 2,
+    };
+}
+
+/**
+ * Convert a frontend element → backend object (1200-px space, spec schema)
+ */
+function elementToSpec(el, idCounter) {
+    if (el.type === 'image') {
+        return {
+            id: idCounter,
+            type: 'image',
+            source: el.source || el.src || '',
+            left: Math.round((el.x || 0) * SCALE),
+            top: Math.round((el.y || 0) * SCALE),
+            width: Math.round((el.width || 120) * SCALE),
+            height: Math.round((el.height || 120) * SCALE),
+            zIndex: el.zIndex ?? 0,
+        };
+    }
+
+    return {
+        id: idCounter,
+        type: 'text',
+        text: el.content || '',
+        left: Math.round((el.x || 0) * SCALE),
+        top: Math.round((el.y || 0) * SCALE),
+        width: Math.round((el.width || 200) * SCALE),
+        height: Math.round((el.fontSize || 14) * SCALE * 1.4),
+        fontSize: Math.round((el.fontSize || 14) * SCALE),
+        fontFamily: el.fontFamily || 'Arial',
+        color: el.color || '#000000',
+        bold: el.fontWeight === '700' || el.fontWeight === '800' || el.fontWeight === 'bold',
+        italic: el.fontStyle === 'italic',
+        align: el.textAlign || 'left',
+        zIndex: el.zIndex ?? 2,
+    };
+}
+
+/**
+ * Build the full template payload to POST/PUT to backend
+ */
+function buildTemplatePayload(name, elements) {
+    return {
+        templateName: name,
+        width: SPEC_SIZE,
+        height: SPEC_SIZE,
+        objects: elements.map((el, i) => elementToSpec(el, i + 1)),
+    };
+}
+
+/**
+ * Restore elements from a backend template (template.objects → frontend elements[])
+ */
+function restoreElementsFromTemplate(template) {
+    if (!template?.objects?.length) return [];
+    return template.objects.map(specToElement);
+}
+
+// ─── History helpers ──────────────────────────────────────────────────────────
+function cloneElements(elements) {
+    return elements.map(el => ({ ...el }));
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 function CDDesignStudio({ onBack }) {
-    const [elements, setElements] = useState(DEFAULT_ELEMENTS);
+    const [elements, setElements] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
     const [discConfig] = useState(DEFAULT_DISC_CONFIG);
-    const [history, setHistory] = useState([DEFAULT_ELEMENTS]);
+    const [history, setHistory] = useState([[]]);
     const [historyIndex, setHistoryIndex] = useState(0);
     const [zoom, setZoom] = useState(() => {
         const baseZoom = (window.innerWidth / 1920) * 2;
         return Math.min(3, Math.max(0.25, Math.round(baseZoom * 100) / 100));
     });
     const [showGrid, setShowGrid] = useState(true);
-    const [templates, setTemplates] = useState(() => [
-        ...BUILT_IN_TEMPLATES,
-        ...loadStoredTemplates(),
-    ]);
-    const [activeTemplate, setActiveTemplate] = useState(BLANK_TEMPLATE_ID);
+
+    // API-backed templates
+    const [templates, setTemplates] = useState([]);          // list from GET /api/templates
+    const [activeTemplate, setActiveTemplate] = useState(null); // currently loaded template object
+    const [loadingTemplates, setLoadingTemplates] = useState(true);
+    const [savingTemplate, setSavingTemplate] = useState(false);
+
     const [dicomData] = useState(SAMPLE_DICOM);
 
+    // ── Load templates from API on mount ────────────────────────────────────
+    useEffect(() => {
+        setLoadingTemplates(true);
+        getTemplates()
+            .then(data => {
+                const list = Array.isArray(data) ? data : (data?.items || data?.data || []);
+                setTemplates(list);
+            })
+            .catch(err => {
+                console.error('Failed to load templates:', err);
+                toast.error(`Failed to load templates: ${err.message}`);
+                setTemplates([]);
+            })
+            .finally(() => setLoadingTemplates(false));
+    }, []);
+
+    // ── History ──────────────────────────────────────────────────────────────
     const pushHistory = useCallback((newElements) => {
         setHistory(prev => {
             const newHistory = prev.slice(0, historyIndex + 1);
@@ -295,6 +244,7 @@ function CDDesignStudio({ onBack }) {
         }
     }, [history, historyIndex]);
 
+    // ── Element operations ───────────────────────────────────────────────────
     const selectedElement = selectedIds.length === 1
         ? elements.find(e => e.id === selectedIds[0])
         : null;
@@ -309,16 +259,13 @@ function CDDesignStudio({ onBack }) {
 
     const addElement = useCallback((newEl) => {
         let currentElements = [...elements];
-        // If adding a new background, remove any existing background image
         if (newEl.subtype === 'background') {
             currentElements = currentElements
                 .filter(e => e.subtype !== 'background')
                 .map(e => ({ ...e, zIndex: Math.max(1, (e.zIndex || 0) + 1) }));
         }
-
         const zIndex = newEl.zIndex !== undefined ? newEl.zIndex : currentElements.length;
         const el = { ...newEl, id: genId(), zIndex };
-
         currentElements.push(el);
         updateElements(currentElements);
         setSelectedIds([el.id]);
@@ -341,64 +288,132 @@ function CDDesignStudio({ onBack }) {
             name: selectedElement.name + ' Copy',
             zIndex: elements.length,
         };
-        const newElements = [...elements, dup];
-        updateElements(newElements);
+        updateElements([...elements, dup]);
         setSelectedIds([dup.id]);
     }, [selectedElement, elements, updateElements]);
 
     const bringForward = useCallback(() => {
         if (!selectedElement) return;
-        const newElements = elements.map(e =>
+        updateElements(elements.map(e =>
             e.id === selectedElement.id ? { ...e, zIndex: e.zIndex + 1 } : e
-        );
-        updateElements(newElements);
+        ));
     }, [selectedElement, elements, updateElements]);
 
     const sendBackward = useCallback(() => {
         if (!selectedElement) return;
-        const newElements = elements.map(e =>
+        updateElements(elements.map(e =>
             e.id === selectedElement.id ? { ...e, zIndex: Math.max(0, e.zIndex - 1) } : e
-        );
-        updateElements(newElements);
+        ));
     }, [selectedElement, elements, updateElements]);
 
-    const saveTemplate = useCallback(() => {
-        const name = prompt('Template name:', 'My Template');
+    // ── Save template → POST or PUT /api/templates ───────────────────────────
+    const saveTemplate = useCallback(async () => {
+        const name = prompt(
+            'Template name:',
+            activeTemplate?.templateName || 'My Template'
+        );
         if (!name) return;
-        const newTemplate = {
-            id: `template-${Date.now()}`,
-            name,
-            elements: cloneElements(elements),
-            discConfig: discConfig,
-            isDefault: false
-        };
-        setTemplates(prev => {
-            const nextTemplates = [...prev, newTemplate];
-            saveStoredTemplates(nextTemplates);
-            return nextTemplates;
-        });
-        setActiveTemplate(newTemplate.id);
-        toast.success('Label template saved locally!');
-    }, [elements, discConfig]);
 
+        setSavingTemplate(true);
+        try {
+            const payload = buildTemplatePayload(name, elements);
+
+            let saved;
+            if (activeTemplate?.id) {
+                // Update existing
+                saved = await updateTemplate(activeTemplate.id, payload);
+                setTemplates(prev => prev.map(t => t.id === saved.id ? saved : t));
+                toast.success('Template updated!');
+            } else {
+                // Create new
+                saved = await createTemplate(payload);
+                setTemplates(prev => [...prev, saved]);
+                toast.success('Template saved!');
+            }
+            setActiveTemplate(saved);
+        } catch (err) {
+            console.error('Save template failed:', err);
+            toast.error(`Save failed: ${err.message}`);
+        } finally {
+            setSavingTemplate(false);
+        }
+    }, [elements, activeTemplate]);
+
+    // ── Save As (always creates new) ─────────────────────────────────────────
+    const saveAsTemplate = useCallback(async () => {
+        const name = prompt('New template name:', 'My Template');
+        if (!name) return;
+
+        setSavingTemplate(true);
+        try {
+            const payload = buildTemplatePayload(name, elements);
+            const saved = await createTemplate(payload);
+            setTemplates(prev => [...prev, saved]);
+            setActiveTemplate(saved);
+            toast.success('Template saved as new!');
+        } catch (err) {
+            console.error('Save As failed:', err);
+            toast.error(`Save As failed: ${err.message}`);
+        } finally {
+            setSavingTemplate(false);
+        }
+    }, [elements]);
+
+    // ── Load template from list ──────────────────────────────────────────────
     const loadTemplate = useCallback((templateId) => {
-        const t = templates.find(t => t.id === templateId);
+        const t = templates.find(t => String(t.id) === String(templateId));
         if (!t) return;
-        updateElements(cloneElements(t.elements));
-        // If template has discConfig, we might want to update it too 
-        // (though currently discConfig is fixed in state)
-        setActiveTemplate(templateId);
-    }, [templates, updateElements]);
+        const restored = restoreElementsFromTemplate(t);
+        setElements(restored);
+        setHistory([restored]);
+        setHistoryIndex(0);
+        setSelectedIds([]);
+        setActiveTemplate(t);
+        toast.success(`Loaded: ${t.templateName}`);
+    }, [templates]);
 
+    // ── Delete template ──────────────────────────────────────────────────────
+    const deleteActiveTemplate = useCallback(async () => {
+        if (!activeTemplate?.id) {
+            toast.error('No saved template is active.');
+            return;
+        }
+        if (!window.confirm(`Delete template "${activeTemplate.templateName}"?`)) return;
+        try {
+            await deleteTemplate(activeTemplate.id);
+            setTemplates(prev => prev.filter(t => t.id !== activeTemplate.id));
+            setActiveTemplate(null);
+            setElements([]);
+            setHistory([[]]);
+            setHistoryIndex(0);
+            setSelectedIds([]);
+            toast.success('Template deleted.');
+        } catch (err) {
+            toast.error(`Delete failed: ${err.message}`);
+        }
+    }, [activeTemplate]);
+
+    // ── New blank canvas ─────────────────────────────────────────────────────
+    const newBlankCanvas = useCallback(() => {
+        if (elements.length > 0 && !window.confirm('Start a new blank canvas? Unsaved changes will be lost.')) return;
+        setElements([]);
+        setHistory([[]]);
+        setHistoryIndex(0);
+        setSelectedIds([]);
+        setActiveTemplate(null);
+    }, [elements]);
+
+    // ── Export JSON ──────────────────────────────────────────────────────────
     const exportTemplate = useCallback(() => {
-        const t = { name: 'Exported Template', elements };
-        const blob = new Blob([JSON.stringify(t, null, 2)], { type: 'application/json' });
+        const payload = buildTemplatePayload(activeTemplate?.templateName || 'Exported Template', elements);
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = 'cd-template.json';
         a.click();
-    }, [elements]);
+    }, [elements, activeTemplate]);
 
+    // ── Import JSON ──────────────────────────────────────────────────────────
     const importTemplate = useCallback(() => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -410,10 +425,18 @@ function CDDesignStudio({ onBack }) {
             reader.onload = (ev) => {
                 try {
                     const data = JSON.parse(ev.target.result);
-                    if (data.elements) {
+                    // Accept both spec format (objects[]) and legacy (elements[])
+                    if (data.objects) {
+                        const restored = restoreElementsFromTemplate(data);
+                        updateElements(restored);
+                        setActiveTemplate(null);
+                        toast.success('Template imported from JSON!');
+                    } else if (data.elements) {
                         updateElements(data.elements);
-                        setActiveTemplate(BLANK_TEMPLATE_ID);
-                        toast.success('Template imported successfully!');
+                        setActiveTemplate(null);
+                        toast.success('Template imported!');
+                    } else {
+                        toast.error('Unrecognized template format.');
                     }
                 } catch {
                     toast.error('Invalid template file.');
@@ -424,7 +447,7 @@ function CDDesignStudio({ onBack }) {
         input.click();
     }, [updateElements]);
 
-    // Keyboard shortcuts
+    // ── Keyboard shortcuts ───────────────────────────────────────────────────
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -452,11 +475,16 @@ function CDDesignStudio({ onBack }) {
                 showGrid={showGrid}
                 onToggleGrid={() => setShowGrid(g => !g)}
                 onSave={saveTemplate}
+                onSaveAs={saveAsTemplate}
+                onNew={newBlankCanvas}
+                onDeleteTemplate={deleteActiveTemplate}
                 onExportTemplate={exportTemplate}
                 onImportTemplate={importTemplate}
                 templates={templates}
                 activeTemplate={activeTemplate}
                 onLoadTemplate={loadTemplate}
+                loadingTemplates={loadingTemplates}
+                savingTemplate={savingTemplate}
             />
 
             {/* Main Editor Area */}
@@ -485,21 +513,16 @@ function CDDesignStudio({ onBack }) {
 
                 {/* Right Sidebar */}
                 <div className="cds-right-panel">
-                    {/* Properties */}
                     <CDPropertiesSidebar
                         element={selectedElement}
                         onUpdate={updateSelectedElement}
                     />
-
-                    {/* Layers Panel */}
                     <CDLayersPanel
                         elements={elements}
                         selectedIds={selectedIds}
                         onSelect={(id) => setSelectedIds([id])}
                         onUpdate={updateElements}
                     />
-
-
                 </div>
             </div>
         </div>
