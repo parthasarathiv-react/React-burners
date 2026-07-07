@@ -27,7 +27,7 @@ export async function getTemplate(id) {
 
 /**
  * POST /api/templates
- * Body: { templateName, width, height, objects }
+ * Body: { name, width, height, objects }
  */
 export async function createTemplate(payload) {
     const response = await api.post('/templates', payload);
@@ -36,10 +36,10 @@ export async function createTemplate(payload) {
 
 /**
  * PUT /api/templates/:id
- * Body: { templateName, width, height, objects }
+ * Body: { name, width, height, objects }
  */
 export async function updateTemplate(id, payload) {
-    const response = await api.put(`/templates/${id}`, payload);
+    const response = await api.put(`/templates/update/${id}`, payload);
     return response.data;
 }
 
@@ -47,7 +47,7 @@ export async function updateTemplate(id, payload) {
  * DELETE /api/templates/:id
  */
 export async function deleteTemplate(id) {
-    const response = await api.delete(`/templates/${id}`);
+    const response = await api.delete(`/templates/delete/${id}`);
     return response.data;
 }
 

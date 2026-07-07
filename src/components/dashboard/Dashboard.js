@@ -16,6 +16,16 @@ import { Flame, Disc, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import CDPreview from '../cd-studio/CDPreview';
 import api from '../../lib/api';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 function Dashboard({ theme, onThemeChange }) {
   const { loading: authLoading } = useAuth();
@@ -29,6 +39,8 @@ function Dashboard({ theme, onThemeChange }) {
   const [burnModalOpen, setBurnModalOpen] = useState(false);
   const [burnTemplate, setBurnTemplate] = useState(null);
   const burnPreviewRef = useRef(null);
+
+  const [deleteStudyConfirmId, setDeleteStudyConfirmId] = useState(null);
 
   const tableContainerRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -106,7 +118,7 @@ function Dashboard({ theme, onThemeChange }) {
       }
     } catch (err) {
       console.error('Failed to fetch local studies:', err);
-      toast.error('Failed to load local studies from server.');
+      toast.error(err?.response?.data?.message || err.message || 'Failed to load local studies from server.');
     }
   }, []);
 
@@ -117,19 +129,25 @@ function Dashboard({ theme, onThemeChange }) {
   }, [fetchLocalStudies]);
 
   const handleDeleteStudy = useCallback(async (id) => {
-    if (window.confirm('Are you sure you want to delete this study?')) {
-      try {
-        await api.delete(`/localstudies/${id}`);
-        toast.success('Study deleted successfully.');
-        fetchLocalStudies();
-      } catch (err) {
-        console.error('Failed to delete study on backend:', err);
-        // Fallback to local deletion from state if backend fails or doesn't support delete
-        setStudies(prev => prev.filter(s => s.id !== id));
-        toast.info('Study removed from local view.');
-      }
+    setDeleteStudyConfirmId(id);
+  }, []);
+
+  const confirmDeleteStudy = useCallback(async () => {
+    if (!deleteStudyConfirmId) return;
+    try {
+      await api.delete(`/localstudies/${deleteStudyConfirmId}`);
+      toast.success('Study deleted successfully.');
+      fetchLocalStudies();
+    } catch (err) {
+      console.error('Failed to delete study on backend:', err);
+      toast.error(err?.response?.data?.message || err.message || 'Failed to delete study on backend.');
+      // Fallback to local deletion from state if backend fails or doesn't support delete
+      setStudies(prev => prev.filter(s => s.id !== deleteStudyConfirmId));
+      toast.info('Study removed from local view.');
+    } finally {
+      setDeleteStudyConfirmId(null);
     }
-  }, [fetchLocalStudies]);
+  }, [deleteStudyConfirmId, fetchLocalStudies]);
 
   const handleUpdateSettings = (newSettings) => {
     saveSettings(newSettings);
@@ -162,6 +180,7 @@ function Dashboard({ theme, onThemeChange }) {
       link.click();
     } catch (err) {
       console.error('Error capturing image:', err);
+      toast.error(err?.message || 'Error capturing image.');
     }
   };
 
@@ -224,6 +243,7 @@ function Dashboard({ theme, onThemeChange }) {
       }
     } catch (err) {
       console.error('Failed to refetch studies after completion:', err);
+      toast.error(err?.response?.data?.message || err.message || 'Failed to refetch studies.');
     }
 
     setCurrentPage(1);
@@ -387,12 +407,27 @@ function Dashboard({ theme, onThemeChange }) {
               <div className="relative shrink-0 scale-90 sm:scale-100 mb-4">
                 <div className="absolute -inset-10 bg-ot-action-top/10 rounded-full blur-3xl animate-pulse" />
                 <div className="relative" ref={burnPreviewRef}>
-                  <CDPreview
-                    elements={burnTemplate?.elements || []}
-                    discConfig={burnTemplate?.discConfig}
-                    dicomData={studies.filter(s => selectedStudyIds.includes(s.id))[0]}
-                    zoom={1}
-                  />
+                  {(() => {
+                    const selectedStudy = studies.find(s => selectedStudyIds.includes(s.id));
+                    const normalizedDicomData = selectedStudy ? {
+                      PatientName: selectedStudy.patientName,
+                      PatientId: selectedStudy.patientId,
+                      StudyDate: selectedStudy.studyDate,
+                      Modality: selectedStudy.modality,
+                      AccessionNumber: selectedStudy.accession,
+                      StudyDescription: selectedStudy.description,
+                      StudyInstanceUID: selectedStudy.studyInstanceUid,
+                    } : {};
+
+                    return (
+                      <CDPreview
+                        elements={burnTemplate?.elements || []}
+                        discConfig={burnTemplate?.discConfig}
+                        dicomData={normalizedDicomData}
+                        zoom={1}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -456,6 +491,27 @@ function Dashboard({ theme, onThemeChange }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Confirm Modal ───────────────────────────────────── */}
+      {deleteStudyConfirmId && (
+        <AlertDialog open={!!deleteStudyConfirmId} onOpenChange={(open) => !open && setDeleteStudyConfirmId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Study</AlertDialogTitle>
+              <AlertDialogDescription>Are you sure you want to delete this study? This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteStudyConfirmId(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteStudy}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </Tabs>
     </DownloadProvider>

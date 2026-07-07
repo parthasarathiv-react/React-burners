@@ -183,7 +183,7 @@ export function DownloadProvider({ children, onStudyReady, onDownloadStarted }) 
                         error: err.message || 'API request failed',
                     },
                 }));
-                toast.error('Failed to start download.');
+                toast.error(err?.response?.data?.message || err.message || 'Failed to start download.');
             }
         },
         []

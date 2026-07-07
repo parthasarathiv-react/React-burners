@@ -79,17 +79,26 @@ function CDElementsSidebar({ onAddElement }) {
 
             // ── Upload to backend API ─────────────────────────────────────────
             setUploadingImage(true);
-            let imagePath = localUrl; // fallback: use local blob URL for canvas preview
+            let displayUrl = localUrl;  // full URL for browser <img> display
+            let sourcePath = localUrl;  // relative path stored in template JSON
 
             try {
                 const result = await uploadImage(file);
-                // Backend returns { path: '/assets/logo.png' } or similar
-                imagePath = result?.path || result?.url || result?.filePath || localUrl;
+                // Backend returns { fileName: '...png', url: '/template-assets/...png' }
+                const relPath = result?.url || result?.path || result?.filePath;
+                if (relPath) {
+                    // source: keep relative path for backend rendering
+                    sourcePath = relPath;
+                    // src: prepend server origin so browser can fetch & display the image
+                    const serverBase = (process.env.REACT_APP_API_BASE_URL || '')
+                        .replace(/\/api\/?$/, '');
+                    displayUrl = `${serverBase}${relPath}`;
+                }
                 toast.success('Image uploaded to server.');
             } catch (err) {
                 console.warn('Image upload API failed, using local preview:', err.message);
-                toast.warning('Image upload failed — showing local preview only.');
-                // Still allow placement with base64 fallback via local URL
+                toast.error(`Image upload failed: ${err.response?.data?.message || err.message}`);
+                // Still allow placement with blob URL fallback
             } finally {
                 setUploadingImage(false);
             }
@@ -106,8 +115,8 @@ function CDElementsSidebar({ onAddElement }) {
                 height: h,
                 naturalWidth: img?.width,
                 naturalHeight: img?.height,
-                src: imagePath,       // used by canvas for display
-                source: imagePath,    // stored in template JSON (relative path from backend)
+                src: displayUrl,      // full URL — used by canvas <img> for display
+                source: sourcePath,   // relative path — stored in template JSON for backend
                 objectFit: isBackground ? 'fill' : 'contain',
                 locked: false,
                 zIndex: isBackground ? 0 : undefined,

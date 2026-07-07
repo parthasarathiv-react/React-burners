@@ -22,6 +22,7 @@ import {
 
 import api from '../../lib/api';
 import { useDownload } from '../../context/DownloadContext';
+import { toast } from 'sonner';
 const MODALITIES = [
     { label: 'Select Modality', value: '' },
     { label: 'CR', value: 'CR' },
@@ -88,6 +89,7 @@ function QueryRetrieve() {
             setResults(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error('Query API error:', err);
+            toast.error(err?.response?.data?.message || err.message || 'Failed to query PACS server.');
             setError(err.message || 'Failed to connect to PACS server.');
             setResults([]);
         } finally {

@@ -3,7 +3,6 @@ import { ChevronDown, Upload, Trash2, Circle } from 'lucide-react';
 
 const FONT_FAMILIES = ['Bai Jamjuree', 'Inter', 'Roboto', 'Georgia', 'Courier New', 'Arial'];
 const FONT_WEIGHTS = ['300', '400', '500', '600', '700', '800'];
-const TEXT_ALIGNS = ['left', 'center', 'right'];
 const FIT_OPTIONS = [
     { value: 'cover', label: 'Fill (Cover)', desc: 'Fill completely' },
     { value: 'contain', label: 'Fit Inside', desc: 'Fit exactly inside boundary' },
@@ -190,34 +189,6 @@ function CDPropertiesSidebar({ element, onUpdate }) {
                             <input type="color" value={element.color || '#000000'} onChange={(e) => onUpdate({ color: e.target.value })} className="cds-color-picker" />
                             <input type="text" value={element.color || '#000000'} onChange={(e) => onUpdate({ color: e.target.value })} className="cds-input cds-color-hex" />
                         </div>
-                    </PropRow>
-
-                    <PropRow label="Bg Color">
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <input type="color" value={element.bgColor || '#ffffff'} onChange={(e) => onUpdate({ bgColor: e.target.value })} className="cds-color-picker" />
-                            <input type="text" value={element.bgColor || ''} onChange={(e) => onUpdate({ bgColor: e.target.value })} className="cds-input cds-color-hex" placeholder="none" />
-                        </div>
-                    </PropRow>
-
-                    <PropRow label="Align">
-                        <div className="cds-align-btns">
-                            {TEXT_ALIGNS.map(a => (
-                                <button
-                                    key={a}
-                                    className={`cds-align-btn ${element.textAlign === a ? 'active' : ''}`}
-                                    onClick={() => onUpdate({ textAlign: a })}
-                                >
-                                    {a === 'left' ? '⬅' : a === 'center' ? '⬛' : '➡'}
-                                </button>
-                            ))}
-                        </div>
-                    </PropRow>
-
-                    <PropRow label="Spacing">
-                        <NumberInput value={element.letterSpacing || 0} onChange={v => onUpdate({ letterSpacing: v })} step={0.5} suffix="px" />
-                    </PropRow>
-                    <PropRow label="Line H">
-                        <NumberInput value={element.lineHeight || 1.4} onChange={v => onUpdate({ lineHeight: v })} min={1} max={3} step={0.1} />
                     </PropRow>
                 </PanelSection>
             )}

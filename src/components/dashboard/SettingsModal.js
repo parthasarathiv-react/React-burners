@@ -42,6 +42,7 @@ const SettingsModal = ({ settings: initialSettings, onUpdate, onClose }) => {
       }
     } catch (err) {
       console.error('Failed to fetch DICOM settings:', err);
+      toast.error(err?.response?.data?.message || err.message);
     } finally {
       setDicomLoading(false);
     }
@@ -88,7 +89,7 @@ const SettingsModal = ({ settings: initialSettings, onUpdate, onClose }) => {
       }
     } catch (err) {
       console.error('Save settings error:', err);
-      toast.error('An error occurred while saving settings.');
+      toast.error(err?.response?.data?.message || err.message || 'An error occurred while saving settings.');
     } finally {
       setSaving(false);
     }

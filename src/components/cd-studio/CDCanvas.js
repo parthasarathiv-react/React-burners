@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { resolveDicomPlaceholders } from './CDDesignStudio';
 import { Copy, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 
-const CD_SIZE = 360;      
+const CD_SIZE = 360;
 
 function CDCanvas({
     elements, selectedIds, onSelect, onUpdateElements,
@@ -14,7 +14,7 @@ function CDCanvas({
     const [dragging, setDragging] = useState(null);
     const [resizing, setResizing] = useState(null);
     const [rotating, setRotating] = useState(null);
-    const [arcRotating, setArcRotating] = useState(null); 
+    const [arcRotating, setArcRotating] = useState(null);
 
     const [contextMenu, setContextMenu] = useState(null);
     const [alignGuides, setAlignGuides] = useState([]);
@@ -328,7 +328,6 @@ function CDCanvas({
             }
         } else if (el.type === 'image') {
             const isBackground = el.subtype === 'background';
-            const isEditingBackground = isBackground && backgroundEditId === el.id;
             content = (
                 <div style={{
                     ...commonStyle,
@@ -342,13 +341,13 @@ function CDCanvas({
                     pointerEvents: 'all',
                 }}
                     onMouseDown={(e) => handleMouseDown(e, el.id)}
-                    onDoubleClick={(e) => {
-                        if (!isBackground) return;
-                        e.stopPropagation();
-                        onSelect([el.id]);
-                        setBackgroundEditId(currentId => currentId === el.id ? null : el.id);
-                    }}
                     onContextMenu={(e) => handleContextMenu(e, el.id)}
+                    onDoubleClick={(e) => {
+                        if (isBackground && !isLocked) {
+                            e.stopPropagation();
+                            setBackgroundEditId(el.id);
+                        }
+                    }}
                 >
                     {el.src
                         ? <img
@@ -364,9 +363,6 @@ function CDCanvas({
                             Image
                         </span>
                     }
-                    {isEditingBackground && (
-                        <div className="cds-bg-edit-pill">Move background</div>
-                    )}
                     {isSelected && !isLocked && renderHandles(el)}
                 </div>
             );
@@ -432,23 +428,6 @@ function CDCanvas({
                 className="cds-canvas-wrap"
                 style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
             >
-                {editingBackground && (
-                    <div
-                        className="cds-bg-edit-preview"
-                        style={{
-                            left: editingBackground.x,
-                            top: editingBackground.y,
-                            width: editingBackground.width,
-                            height: editingBackground.height,
-                            transform: `rotate(${editingBackground.rotation || 0}deg)`,
-                            opacity: Math.min(0.45, Math.max(0.18, editingBackground.opacity ?? 1)),
-                            zIndex: 0,
-                        }}
-                    >
-                        <img src={editingBackground.src} alt="" />
-                    </div>
-                )}
-
 
                 {/* Main canvas */}
                 <div
@@ -487,6 +466,28 @@ function CDCanvas({
                         )}
                     </svg>
                 </div>
+
+                {/* Background Edit Preview (Full Image unclipped) */}
+                {editingBackground && (
+                    <div
+                        className="cds-bg-edit-preview"
+                        style={{
+                            left: editingBackground.x,
+                            top: editingBackground.y,
+                            width: editingBackground.width,
+                            height: editingBackground.height,
+                            transform: `rotate(${editingBackground.rotation || 0}deg)`,
+                            zIndex: 10,
+                        }}
+                    >
+                        <img 
+                            src={editingBackground.src} 
+                            alt="" 
+                            style={{ width: '100%', height: '100%', objectFit: 'fill', opacity: 0.45 }} 
+                        />
+                        <div className="cds-bg-edit-pill">Background Offset Mode</div>
+                    </div>
+                )}
             </div>
 
             {/* Context Menu */}

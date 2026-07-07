@@ -65,7 +65,7 @@ function RemoteDicomSettings() {
       }
     } catch (err) {
       console.error('Fetch remote DICOM error:', err);
-      toast.error('Could not load remote DICOM servers.');
+      toast.error(err?.response?.data?.message || err.message || 'Could not load remote DICOM servers.');
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,7 @@ function RemoteDicomSettings() {
           }
         } catch (err) {
           console.error('Save remote DICOM error:', err);
-          toast.error('An error occurred while saving the server.');
+          toast.error(err?.response?.data?.message || err.message || 'An error occurred while saving the server.');
         } finally {
           setSavingForm(false);
         }
@@ -163,7 +163,7 @@ function RemoteDicomSettings() {
           }
         } catch (err) {
           console.error('Delete remote DICOM error:', err);
-          toast.error('An error occurred while deleting the server.');
+          toast.error(err?.response?.data?.message || err.message || 'An error occurred while deleting the server.');
         }
       },
     });

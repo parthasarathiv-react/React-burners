@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import { Cpu, HardDrive, Activity, Disc } from 'lucide-react';
+import { getTemplates, getTemplate } from '../../utils/templateApi';
+import { restoreElementsFromTemplate } from '../cd-studio/CDDesignStudio';
 import {
   Select,
   SelectContent,
@@ -26,24 +28,36 @@ function BottomStatus({ settings, selectedStudies = [], onExecuteBurn }) {
 
   const usage = settings?.maxDiscUsage || 62;
 
-  const handleExecuteBurn = () => {
+  const [burning, setBurning] = useState(false);
+
+  const handleExecuteBurn = async () => {
     if (selectedStudies.length === 0) {
       toast.warning('Please select at least one study to burn.');
       return;
     }
 
-    const activeId = localStorage.getItem(ACTIVE_TEMPLATE_KEY);
-    let template = null;
-    if (activeId) {
-      try {
-        const templates = JSON.parse(localStorage.getItem(CD_TEMPLATE_STORAGE_KEY) || '[]');
-        template = templates.find(t => t.id === activeId);
-      } catch (e) {
-        console.error('Error loading template', e);
+    try {
+      setBurning(true);
+      const res = await getTemplates();
+      const allTemplates = Array.isArray(res) ? res : (res?.data || res?.items || []);
+      const defaultTemp = allTemplates.find(t => t.isDefault === true);
+      
+      let template = null;
+      if (defaultTemp && defaultTemp.id) {
+         template = await getTemplate(defaultTemp.id);
+         template.elements = restoreElementsFromTemplate(template);
+      } else {
+         toast.warning('No default template found on the server.');
+         return;
       }
+      
+      onExecuteBurn?.(template);
+    } catch (err) {
+      console.error('Failed to load default template', err);
+      toast.error(err?.response?.data?.message || err.message || 'Failed to fetch default template from server.');
+    } finally {
+      setBurning(false);
     }
-
-    onExecuteBurn?.(template);
   };
 
   return (
@@ -137,10 +151,13 @@ function BottomStatus({ settings, selectedStudies = [], onExecuteBurn }) {
 
           {/* Main Action Button */}
           <Button
-            className="relative pl-8 pr-10 h-[48px] bg-gradient-to-r from-orange-600 to-red-600 rounded-r-full rounded-l-[10px] border border-white/10 shadow-lg group-active:scale-95 transition-all duration-300 hover:brightness-110"
+            disabled={burning}
+            className="relative pl-8 pr-10 h-[48px] bg-gradient-to-r from-orange-600 to-red-600 rounded-r-full rounded-l-[10px] border border-white/10 shadow-lg group-active:scale-95 transition-all duration-300 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex flex-col items-start leading-none">
-              <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white">Execute Burn</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.25em] text-white">
+                {burning ? 'Preparing...' : 'Execute Burn'}
+              </span>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[8px] font-bold text-white/50 uppercase tracking-widest">Secured Mission #4512</span>
                 <Disc className="animate-spin-slow text-white/40" size={12} />

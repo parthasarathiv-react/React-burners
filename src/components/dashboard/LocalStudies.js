@@ -14,6 +14,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import api from '../../lib/api';
 import { useDownload } from '../../context/DownloadContext';
+import { toast } from 'sonner';
 
 // Backend status enum
 // 0 = Pending, 1 = Downloading, 2 = Completed, 3 = Failed
@@ -116,6 +117,7 @@ function LocalStudies({ selectedIds = [], onSelectChange, onBurnReady }) {
             setStudies(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             console.error('[LocalStudies] fetch error:', err);
+            toast.error(err?.response?.data?.message || err.message || 'Failed to load local studies.');
             setError(err.message || 'Failed to load local studies.');
         } finally {
             setLoading(false);

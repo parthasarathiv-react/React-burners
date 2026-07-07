@@ -149,7 +149,7 @@ function UserManagement({ initialUsers = [], onRefresh }) {
             }
           } catch (error) {
             console.error('Error adding user:', error);
-            toast.error('An error occurred while adding the user');
+            toast.error(error?.response?.data?.message || error.message || 'An error occurred while adding the user');
           }
         },
       });
@@ -178,7 +178,7 @@ function UserManagement({ initialUsers = [], onRefresh }) {
             }
           } catch (error) {
             console.error('Error updating user:', error);
-            toast.error('An error occurred while updating the user');
+            toast.error(error?.response?.data?.message || error.message || 'An error occurred while updating the user');
           }
         },
       });
@@ -205,7 +205,7 @@ function UserManagement({ initialUsers = [], onRefresh }) {
           }
         } catch (error) {
           console.error('Error deleting user:', error);
-          toast.error('An error occurred while deleting the user');
+          toast.error(error?.response?.data?.message || error.message || 'An error occurred while deleting the user');
         }
       },
     });

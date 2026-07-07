@@ -39,7 +39,7 @@ function CDTopbar({
                         <div className="cds-brand-title">CD Design Studio</div>
                         <div className="cds-brand-sub">
                             {activeTemplate
-                                ? activeTemplate.templateName
+                                ? activeTemplate.name
                                 : 'DICOM Label Editor'}
                         </div>
                     </div>
@@ -131,7 +131,7 @@ function CDTopbar({
                                     className={`cds-dropdown-item ${activeTemplate?.id === t.id ? 'active' : ''}`}
                                     onClick={() => { onLoadTemplate(t.id); closeMenu(); }}
                                 >
-                                    {t.templateName || t.name}
+                                    {t.name || t.name}
                                 </button>
                             ))}
                         </div>

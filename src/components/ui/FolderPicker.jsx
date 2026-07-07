@@ -4,6 +4,7 @@ import { Input } from './input';
 import { Button } from './button';
 import api from 'src/lib/api';
 import { cn } from 'src/lib/utils';
+import { toast } from 'sonner';
 
 export default function FolderPicker({
     value = '',
@@ -33,6 +34,7 @@ export default function FolderPicker({
             setShowFolderBrowser(true);
         } catch (error) {
             console.error('Failed to load drives:', error);
+            toast.error(error?.response?.data?.message || error.message || 'Failed to load drives');
         }
     };
 
@@ -44,6 +46,7 @@ export default function FolderPicker({
             setCurrentPath(path);
         } catch (error) {
             console.error(`Failed to load folders for path: ${path}`, error);
+            toast.error(error?.response?.data?.message || error.message || `Failed to load folders for path: ${path}`);
         }
     };
 

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../lib/api';
+import { toast } from 'sonner';
 
 const AuthContext = createContext();
 
@@ -22,6 +23,7 @@ export const AuthProvider = ({ children }) => {
             }
         } catch (error) {
             console.error('Failed to fetch roles:', error);
+            toast.error(error?.response?.data?.message || error.message || 'Failed to fetch roles');
         }
         return [];
     };

@@ -9,9 +9,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, selectedIds = [], onSelectChange, onDelete }) {
   const [instanceCounts, setInstanceCounts] = useState({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const { downloadStates } = useDownload();
 
   const toggleSelectAll = () => {
@@ -42,9 +53,8 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
   const handleDelete = (id) => {
     if (onDelete) {
       onDelete(id);
-    } else if (window.confirm('Are you sure you want to delete this study?')) {
-      const updated = deleteStudy(id);
-      onUpdate(updated);
+    } else {
+      setDeleteConfirmId(id);
     }
   };
 
@@ -127,13 +137,14 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
               const isSelected = selectedIds.includes(row.id);
               const visibleInstances = isIncoming ? instanceCounts[row.id] ?? 0 : row.instance;
 
-              // Check if this study has an active download state via studyInstanceUid
+              // Status codes from API: 0=Pending, 1=Downloading, 2=Completed, 3=Failed
               const uid = row.studyInstanceUid;
               const dlState = uid ? downloadStates[uid] : null;
-              const statusLower = String(row.status || '').toLowerCase();
-              const isDownloading = dlState?.status === 'downloading' || statusLower === 'downloading' || row.status === 1;
-              const isCompleted = dlState?.status === 'completed' || statusLower === 'completed' || row.status === 2;
-              const isFailed = dlState?.status === 'failed' || statusLower === 'failed' || row.status === 3;
+              const statusCode = Number(row.status);
+              const isPending = statusCode === 0;
+              const isDownloading = statusCode === 1;
+              const isCompleted = statusCode === 2;
+              const isFailed = statusCode === 3;
 
               // Progress percentage (guard division by zero)
               const progressPct = dlState
@@ -181,9 +192,14 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
                   </td>
                   <td className="py-2.5 px-3 text-ot-text-muted text-xs md:text-sm truncate max-w-[150px] md:max-w-[200px]">{row.description}</td>
 
-                  {/* Status column */}
+                  {/* Status column — driven by API status code: 0=Pending, 1=Downloading, 2=Completed, 3=Failed */}
                   <td className="py-2.5 px-3 text-center min-w-[120px]">
-                    {isDownloading ? (
+                    {isPending ? (
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Loader2 size={13} className="text-yellow-400/80" />
+                        <span className="text-[10px] font-bold text-yellow-400/80 uppercase tracking-widest">Pending</span>
+                      </div>
+                    ) : isDownloading ? (
                       <div className="flex flex-col items-center gap-1">
                         <div className="flex items-center gap-1.5">
                           <Download size={11} className="text-ot-action-top animate-bounce" />
@@ -246,6 +262,33 @@ function StudyTable({ studies, onUpdate, incomingStudyId, onIncomingComplete, se
           )}
         </tbody>
       </table>
+
+      {/* ── Confirm Modal ───────────────────────────────────── */}
+      {deleteConfirmId && (
+        <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Study</AlertDialogTitle>
+              <AlertDialogDescription>Are you sure you want to delete this study? This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteConfirmId(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (deleteConfirmId) {
+                    const updated = deleteStudy(deleteConfirmId);
+                    onUpdate(updated);
+                    setDeleteConfirmId(null);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

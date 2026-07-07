@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Disc, Trash2, Layout } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 const CD_TEMPLATE_STORAGE_KEY = 'raster_cd_label_templates';
 const ACTIVE_TEMPLATE_KEY = 'raster_active_burn_template';
@@ -9,6 +20,7 @@ const ACTIVE_TEMPLATE_KEY = 'raster_active_burn_template';
 const BravoSetting = () => {
     const [templates, setTemplates] = useState([]);
     const [activeTemplateId, setActiveTemplateId] = useState('');
+    const [deleteConfirmId, setDeleteConfirmId] = useState(null);
 
     useEffect(() => {
         loadTemplates();
@@ -25,6 +37,7 @@ const BravoSetting = () => {
             }
         } catch (e) {
             console.error('Failed to load templates', e);
+            toast.error(e.message || 'Failed to load templates from local storage');
         }
     };
 
@@ -34,16 +47,21 @@ const BravoSetting = () => {
     };
 
     const handleDeleteTemplate = (id) => {
-        if (!window.confirm('Are you sure you want to delete this template?')) return;
+        setDeleteConfirmId(id);
+    };
 
-        const updated = templates.filter(t => t.id !== id);
+    const confirmDeleteTemplate = () => {
+        if (!deleteConfirmId) return;
+
+        const updated = templates.filter(t => t.id !== deleteConfirmId);
         setTemplates(updated);
         localStorage.setItem(CD_TEMPLATE_STORAGE_KEY, JSON.stringify(updated));
 
-        if (activeTemplateId === id) {
+        if (activeTemplateId === deleteConfirmId) {
             setActiveTemplateId('');
             localStorage.removeItem(ACTIVE_TEMPLATE_KEY);
         }
+        setDeleteConfirmId(null);
     };
 
     return (
@@ -137,6 +155,27 @@ const BravoSetting = () => {
                     <span className="text-white font-mono px-1">studyDate</span> from the selected study in the archive table.
                 </p>
             </div>
+
+            {/* ── Confirm Modal ───────────────────────────────────── */}
+            {deleteConfirmId && (
+                <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+                            <AlertDialogDescription>Are you sure you want to delete this template? This action cannot be undone.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => setDeleteConfirmId(null)}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={confirmDeleteTemplate}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                Confirm
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </div>
     );
 };
