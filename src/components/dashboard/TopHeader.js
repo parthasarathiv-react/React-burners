@@ -1,8 +1,10 @@
 import { Settings, Power, Disc3 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function TopHeader({ activeTab, onTabChange, onOpenSettings }) {
+  const navigate = useNavigate();
   const { user, role, logout } = useAuth();
   const tabs = ['Studies', 'Query/Retrieve', 'Job Queue'];
 
@@ -80,7 +82,8 @@ function TopHeader({ activeTab, onTabChange, onOpenSettings }) {
             className="p-2.5 rounded-xl bg-pink-500/10 border border-pink-500/20 hover:bg-pink-500 hover:text-white transition-all outline-none text-pink-500 group"
             onClick={() => {
               logout();
-              window.location.href = '/';
+              localStorage.clear(); // forcefully ensure everything is wiped
+              navigate('/', { replace: true });
             }}
           >
             <Power size={18} className="transition-transform group-hover:scale-110" />

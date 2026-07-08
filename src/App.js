@@ -48,17 +48,17 @@ function ProtectedRoute({ children }) {
   const { loading } = useAuth();
   const token = localStorage.getItem('token');
 
-  // if (loading) {
-  //   return (
-  //     <div className="min-h-screen bg-transparent flex items-center justify-center text-white font-baijam">
-  //       Initializing...
-  //     </div>
-  //   );
-  // }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center text-white font-baijam">
+        Initializing...
+      </div>
+    );
+  }
 
-  // if (!token) {
-  //   return <Navigate to="/" replace />;
-  // }
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
 
   return children;
 }

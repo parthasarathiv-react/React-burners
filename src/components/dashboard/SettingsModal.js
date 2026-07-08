@@ -89,7 +89,14 @@ const SettingsModal = ({ settings: initialSettings, onUpdate, onClose }) => {
       }
     } catch (err) {
       console.error('Save settings error:', err);
-      toast.error(err?.response?.data?.message || err.message || 'An error occurred while saving settings.');
+      
+      if (err?.response?.status === 400 && err?.response?.data?.errors) {
+        const validationErrors = err.response.data.errors;
+        const errorMessages = Object.values(validationErrors).flat();
+        errorMessages.forEach(msg => toast.error(msg));
+      } else {
+        toast.error(err?.response?.data?.title || err?.response?.data?.message || err.message || 'An error occurred while saving settings.');
+      }
     } finally {
       setSaving(false);
     }

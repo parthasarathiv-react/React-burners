@@ -56,9 +56,9 @@ export const AuthProvider = ({ children }) => {
         // Continuous check for token removal
         const interval = setInterval(() => {
             const token = localStorage.getItem('token');
-            // if (!token && window.location.pathname !== '/') {
-            //     window.location.href = '/';
-            // }
+            if (!token && window.location.pathname !== '/') {
+                window.location.href = '/';
+            }
         }, 2000);
 
         return () => clearInterval(interval);
