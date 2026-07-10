@@ -13,14 +13,14 @@ import {
     deleteTemplate,
 } from '../../utils/templateApi';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from '../ui/alert-dialog';
 import './CDDesignStudio.css';
 
@@ -324,7 +324,6 @@ function CDDesignStudio({ onBack }) {
         const baseZoom = (window.innerWidth / 1920) * 2;
         return Math.min(3, Math.max(0.25, Math.round(baseZoom * 100) / 100));
     });
-    const [showGrid, setShowGrid] = useState(true);
 
     // API-backed templates
     const [templates, setTemplates] = useState([]);          // list from GET /api/templates
@@ -643,8 +642,6 @@ function CDDesignStudio({ onBack }) {
                 canRedo={historyIndex < history.length - 1}
                 zoom={zoom}
                 onZoomChange={setZoom}
-                showGrid={showGrid}
-                onToggleGrid={() => setShowGrid(g => !g)}
                 onSave={saveTemplate}
                 onSaveAs={saveAsTemplate}
                 onNew={newBlankCanvas}
@@ -673,7 +670,6 @@ function CDDesignStudio({ onBack }) {
                     onUpdateElements={updateElements}
                     zoom={zoom}
                     onZoomChange={setZoom}
-                    showGrid={showGrid}
                     dicomData={dicomData}
                     discConfig={discConfig}
                     onDuplicate={duplicateSelected}

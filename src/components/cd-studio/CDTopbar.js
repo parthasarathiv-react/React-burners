@@ -12,7 +12,7 @@ function CDTopbar({
     onExportTemplate, onImportTemplate,
     templates, activeTemplate, onLoadTemplate,
     loadingTemplates, savingTemplate,
-    showGrid, onToggleGrid,
+
 }) {
     const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
     const zoomPct = Math.round(zoom * 100);
@@ -75,13 +75,7 @@ function CDTopbar({
 
                 <div className="cds-tb-divider" />
 
-                <button
-                    className={`cds-tb-btn ${showGrid ? 'cds-tb-btn--active' : ''}`}
-                    onClick={onToggleGrid}
-                    title="Toggle Grid"
-                >
-                    <Grid3X3 size={15} />
-                </button>
+
             </div>
 
             {/* Right Group */}
@@ -92,7 +86,7 @@ function CDTopbar({
                     <Plus size={15} />
                     <span>New</span>
                 </button>
-
+                {/* 
                 <button className="cds-tb-btn" onClick={onImportTemplate} title="Import JSON">
                     <Upload size={15} />
                     <span>Import</span>
@@ -100,7 +94,7 @@ function CDTopbar({
                 <button className="cds-tb-btn" onClick={onExportTemplate} title="Export JSON">
                     <Download size={15} />
                     <span>Export</span>
-                </button>
+                </button> */}
 
                 <div className="cds-tb-divider" />
 
