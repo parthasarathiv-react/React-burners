@@ -69,6 +69,18 @@ export async function uploadImage(file) {
 // ─── Burn Job API ─────────────────────────────────────────────────────────────
 
 /**
+ * POST /api/eburn/start
+ * Body: { studyID: number, templateId: number }
+ */
+export async function startEburn({ studyID, templateId }) {
+    const response = await api.post('/eburn/start', {
+        studyID: Number(studyID),
+        templateId: Number(templateId),
+    });
+    return response.data;
+}
+
+/**
  * POST /api/burnjobs
  * Body: { templateId, studyInstanceUID, ... }
  */

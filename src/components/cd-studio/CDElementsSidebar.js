@@ -23,14 +23,21 @@ const DICOM_FIELDS = [
     { label: 'Study Instance UID',icon: Database,   color: '#5fa6ff', preset: { content: '{{StudyInstanceUID}}', name: 'Study Instance UID'} },
 ];
 
+// 3 mm left padding + 3 mm right padding = 18 px total padding (9 px on each side)
+const calcLabelWidth = (text = '', fontSize = 14) => {
+    const chars = String(text).length;
+    const estimatedWidth = Math.ceil(chars * (fontSize * 0.62));
+    return Math.max(60, estimatedWidth + 18);
+};
+
 const DEFAULT_ELEMENT_PROPS = {
     x: 150, y: 150, rotation: 0, opacity: 1,
     locked: false, visible: true,
 };
 
 const TYPE_DEFAULTS = {
-    label:   { width: 200, content: 'Label Text', fontFamily: 'Arial', fontSize: 14, fontWeight: '500', color: '#222222', textAlign: 'center', letterSpacing: 0, lineHeight: 1.4 },
-    dynamic: { width: 200, content: '{{PatientName}}', fontFamily: 'Arial', fontSize: 14, fontWeight: '500', color: '#222222', textAlign: 'center', letterSpacing: 0, lineHeight: 1.4 },
+    label:   { width: calcLabelWidth('Label Text'), content: 'Label Text', fontFamily: 'Arial', fontSize: 14, fontWeight: '500', color: '#222222', textAlign: 'center', letterSpacing: 0, lineHeight: 1.4 },
+    dynamic: { width: calcLabelWidth('{{PatientName}}'), content: '{{PatientName}}', fontFamily: 'Arial', fontSize: 14, fontWeight: '500', color: '#222222', textAlign: 'center', letterSpacing: 0, lineHeight: 1.4 },
     image:   { width: 120, height: 120, src: '', source: '', borderRadius: 0, objectFit: 'contain' },
 };
 
@@ -128,25 +135,30 @@ function CDElementsSidebar({ onAddElement }) {
     };
 
     const addDynamicField = (field) => {
+        const text = field.preset.content || '';
+        const w = calcLabelWidth(text, 14);
         onAddElement({
             type: 'dynamic',
             name: field.preset.name,
             ...DEFAULT_ELEMENT_PROPS,
             ...TYPE_DEFAULTS.dynamic,
             ...field.preset,
-            x: 120 + Math.random() * 60,
-            y: 120 + Math.random() * 60,
+            width: w,
+            x: Math.round((CD_SIZE - w) / 2),
+            y: 50 + Math.floor(Math.random() * 15),
         });
     };
 
     const addCustomText = () => {
+        const w = calcLabelWidth('Label Text', 14);
         onAddElement({
             type: 'label',
             name: 'Custom Label',
             ...DEFAULT_ELEMENT_PROPS,
             ...TYPE_DEFAULTS.label,
-            x: 120 + Math.random() * 60,
-            y: 120 + Math.random() * 60,
+            width: w,
+            x: Math.round((CD_SIZE - w) / 2),
+            y: 50 + Math.floor(Math.random() * 15),
         });
     };
 

@@ -1,8 +1,97 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { resolveDicomPlaceholders } from './CDDesignStudio';
+import { resolveDicomPlaceholders, SAMPLE_DICOM } from './CDDesignStudio';
 import { Copy, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { toast } from 'sonner';
+import DefaultCDQRCodes from './DefaultCDQRCodes';
 
 const CD_SIZE = 360;
+
+export function getElementDimensions(el, dicomData) {
+    if (!el) return { width: 0, height: 0 };
+
+    const isTextEl = el.type === 'label' || el.type === 'dynamic' || el.type === 'text' || el.type === 'media-label';
+    if (!isTextEl) {
+        return { width: el.width || 120, height: el.height || 120 };
+    }
+
+    const displayText = el.type === 'dynamic'
+        ? resolveDicomPlaceholders(el.content, dicomData || SAMPLE_DICOM)
+        : (el.content || '');
+
+    let textWidth = 40;
+    try {
+        if (typeof document !== 'undefined') {
+            const canvas = getElementDimensions.canvas || (getElementDimensions.canvas = document.createElement('canvas'));
+            const ctx = canvas.getContext('2d');
+            const fontSize = el.fontSize || 14;
+            const fontFamily = el.fontFamily || 'Bai Jamjuree, Arial, sans-serif';
+            const fontWeight = el.fontWeight || '400';
+            ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+            const metrics = ctx.measureText(displayText || ' ');
+            textWidth = metrics.width;
+        } else {
+            textWidth = (displayText || '').length * ((el.fontSize || 14) * 0.55);
+        }
+    } catch (e) {
+        textWidth = (displayText || '').length * ((el.fontSize || 14) * 0.55);
+    }
+
+    // Include 3mm left/right internal padding (9px + 9px = 18px total)
+    const totalWidth = Math.max(40, Math.ceil(textWidth + 18));
+    const totalHeight = Math.ceil((el.fontSize || 14) * (el.lineHeight || 1.4));
+
+    return { width: totalWidth, height: totalHeight };
+}
+
+export function adjustIfOverlappingBarcode(el, discConfig, dicomData) {
+    if (!el || el.subtype === 'background' || el.arcMode) return { moved: false, x: el.x, y: el.y };
+
+    const pxPerMm = (CD_SIZE / 2) / (discConfig?.outerRadius || 60);
+    const hubR = (discConfig?.innerRadius || 11) * pxPerMm;
+    const barcodeCircleRadius = hubR + 10 * pxPerMm; // ~63px radius from center (180, 180)
+
+    const { width: w, height: h } = getElementDimensions(el, dicomData);
+
+    // Find closest point on element rectangle [el.x, el.x + w] x [el.y, el.y + h] to CD center (180, 180)
+    const closestX = Math.max(el.x, Math.min(180, el.x + w));
+    const closestY = Math.max(el.y, Math.min(180, el.y + h));
+
+    const distX = 180 - closestX;
+    const distY = 180 - closestY;
+    const distanceToCenter = Math.sqrt(distX * distX + distY * distY);
+
+    if (distanceToCenter < barcodeCircleRadius) {
+        const elCX = el.x + w / 2;
+        const elCY = el.y + h / 2;
+        let dx = elCX - 180;
+        let dy = elCY - 180;
+        let len = Math.sqrt(dx * dx + dy * dy);
+
+        if (len === 0) {
+            dx = 0;
+            dy = -1;
+            len = 1;
+        }
+
+        const dirX = dx / len;
+        const dirY = dy / len;
+
+        // 2 to 3 mm space (2.5 * pxPerMm = ~7.5px)
+        const gapPx = 2.5 * pxPerMm;
+        const radialHalfSize = Math.abs(dirX) * (w / 2) + Math.abs(dirY) * (h / 2);
+
+        const targetDist = barcodeCircleRadius + radialHalfSize + gapPx;
+        const newCX = 180 + dirX * targetDist;
+        const newCY = 180 + dirY * targetDist;
+
+        const newX = Math.round(newCX - w / 2);
+        const newY = Math.round(newCY - h / 2);
+
+        return { moved: true, x: newX, y: newY };
+    }
+
+    return { moved: false, x: el.x, y: el.y };
+}
 
 function CDCanvas({
     elements, selectedIds, onSelect, onUpdateElements,
@@ -172,12 +261,34 @@ function CDCanvas({
     }, [dragging, arcRotating, resizing, rotating, elements, getCanvasPoint, snapToGuides, onUpdateElements, zoom]);
 
     const handleMouseUp = useCallback(() => {
+        if (dragging) {
+            const el = elements.find(e => e.id === dragging.id);
+            if (el && el.subtype !== 'background') {
+                const adjusted = adjustIfOverlappingBarcode(el, discConfig, dicomData);
+                if (adjusted.moved) {
+                    const newElements = elements.map(e => e.id === el.id ? { ...e, x: adjusted.x, y: adjusted.y } : e);
+                    onUpdateElements(newElements);
+                    toast.warning('Cannot place label top of the bar code');
+                }
+            }
+        }
+        if (resizing) {
+            const el = elements.find(e => e.id === resizing.id);
+            if (el && el.subtype !== 'background') {
+                const adjusted = adjustIfOverlappingBarcode(el, discConfig, dicomData);
+                if (adjusted.moved) {
+                    const newElements = elements.map(e => e.id === el.id ? { ...e, x: adjusted.x, y: adjusted.y } : e);
+                    onUpdateElements(newElements);
+                    toast.warning('Cannot place label top of the bar code');
+                }
+            }
+        }
         setDragging(null);
         setResizing(null);
         setRotating(null);
         setArcRotating(null);
         setAlignGuides([]);
-    }, []);
+    }, [dragging, resizing, elements, discConfig, dicomData, onUpdateElements]);
 
     const handleCanvasClick = useCallback((e) => {
         if (e.target === canvasRef.current || e.target === workspaceRef.current) {
@@ -307,7 +418,11 @@ function CDCanvas({
                         className={`cds-label-element ${isSelected ? 'cds-label-element--selected' : ''}`}
                         style={{
                             ...commonStyle,
-                            width: el.width,
+                            width: 'fit-content',
+                            minWidth: '40px',
+                            padding: '3px 9px',
+                            boxSizing: 'border-box',
+                            transformOrigin: 'center center',
                             fontFamily: el.fontFamily || 'Bai Jamjuree',
                             fontSize: el.fontSize || 14,
                             fontWeight: el.fontWeight || '400',
@@ -449,6 +564,9 @@ function CDCanvas({
                     <svg
                         style={{ position: 'absolute', inset: 0, width: CD_SIZE, height: CD_SIZE, pointerEvents: 'none', zIndex: 9000 }}
                     >
+                        {/* Default 7 QR Codes Ring (1cm from center hub circle) */}
+                        <DefaultCDQRCodes discConfig={discConfig} />
+
                         {/* Inner hub clipping/ring - solid so elements don't show inside the hole */}
                         <circle cx={CD_SIZE / 2} cy={CD_SIZE / 2} r={hubR}
                             fill="#f0f0f4" stroke="rgba(0,0,0,0.15)" strokeWidth="1.5" />

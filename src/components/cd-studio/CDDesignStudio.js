@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import CDTopbar from './CDTopbar';
 import CDElementsSidebar from './CDElementsSidebar';
-import CDCanvas from './CDCanvas';
+import CDCanvas, { adjustIfOverlappingBarcode } from './CDCanvas';
 import CDPropertiesSidebar from './CDPropertiesSidebar';
 import CDLayersPanel from './CDLayersPanel';
 import {
@@ -57,12 +57,13 @@ export function resolveDicomPlaceholders(text, dicomData) {
 
 export { SAMPLE_DICOM, DICOM_PLACEHOLDER_MAP };
 
-// ─── Canvas / CD dimensions (frontend display units) ─────────────────────────
-// The spec defines 1200×1200 px, but we render at 360 px (scaled by zoom).
-// When serializing to the backend, we use the 1200-based coordinate space.
+// ─── Canvas / CD dimensions ───────────────────────────────────────────────────
+// The canvas renders at DISPLAY_SIZE = 360 px (scaled by zoom).
+// The physical CD spec size is 120 mm x 120 mm.
+// Scale: 360 px / 120 mm = 3 px/mm.
 const DISPLAY_SIZE = 360;
-const SPEC_SIZE = 1200;
-const SCALE = SPEC_SIZE / DISPLAY_SIZE; // 3.333…
+const MM_SIZE = 120;
+const MM_SCALE = DISPLAY_SIZE / MM_SIZE; // 3 px per mm
 
 let nextId = 100;
 function genId() { return `el-${nextId++}`; }
@@ -74,33 +75,103 @@ const DEFAULT_DISC_CONFIG = {
     innerRadius: 11,
 };
 
+// ─── Static Ring QR Codes (IDs 2 - 8) ──────────────────────────────────────────
+const STATIC_OBJECTS = [
+    {
+        id: 2,
+        type: 'qrcode',
+        dataField: '{{JobId}}',
+        centerRadiusMm: 17,
+        angle: -90,
+        sizeMm: 6.5,
+        zIndex: 1,
+    },
+    {
+        id: 3,
+        type: 'qrcode',
+        dataField: '{{JobId}}',
+        centerRadiusMm: 17,
+        angle: -38.571429,
+        sizeMm: 6.5,
+        zIndex: 1,
+    },
+    {
+        id: 4,
+        type: 'qrcode',
+        dataField: '{{JobId}}',
+        centerRadiusMm: 17,
+        angle: 12.857143,
+        sizeMm: 6.5,
+        zIndex: 1,
+    },
+    {
+        id: 5,
+        type: 'qrcode',
+        dataField: '{{JobId}}',
+        centerRadiusMm: 17,
+        angle: 64.285714,
+        sizeMm: 6.5,
+        zIndex: 1,
+    },
+    {
+        id: 6,
+        type: 'qrcode',
+        dataField: '{{JobId}}',
+        centerRadiusMm: 17,
+        angle: 115.714286,
+        sizeMm: 6.5,
+        zIndex: 1,
+    },
+    {
+        id: 7,
+        type: 'qrcode',
+        dataField: '{{JobId}}',
+        centerRadiusMm: 17,
+        angle: 167.142857,
+        sizeMm: 6.5,
+        zIndex: 1,
+    },
+    {
+        id: 8,
+        type: 'qrcode',
+        dataField: '{{JobId}}',
+        centerRadiusMm: 17,
+        angle: 218.571429,
+        sizeMm: 6.5,
+        zIndex: 1,
+    },
+];
+
 // ─── Schema converters ────────────────────────────────────────────────────────
 
 /**
- * Convert a backend object (1200-px space, spec schema) → frontend element
+ * Convert a backend object (spec schema) → frontend canvas element (px space)
  */
-function specToElement(obj) {
+function specToElement(obj, isMm = true) {
+    if (obj.type === 'qrcode') return null; // Static QR ring is rendered separately by overlay component
+
+    const scaleFactor = isMm ? MM_SCALE : (DISPLAY_SIZE / 1200);
+
     if (obj.type === 'image') {
         const relativeSrc = obj.source || '';
-        // Build a full URL for the canvas <img> tag so the browser can fetch the image
         const serverBase = (process.env.REACT_APP_API_BASE_URL || '').replace(/\/api\/?$/, '');
         const displaySrc = relativeSrc && !relativeSrc.startsWith('blob:') && !relativeSrc.startsWith('http')
             ? `${serverBase}${relativeSrc}`
             : relativeSrc;
 
-        const isBackground = obj.left === 0 && obj.top === 0 && obj.width === SPEC_SIZE;
+        const widthPx = Math.round(obj.width * scaleFactor);
+        const isBackground = obj.left === 0 && obj.top === 0 && (widthPx >= DISPLAY_SIZE - 2);
         return {
             id: String(obj.id),
             type: 'image',
             subtype: isBackground ? 'background' : 'custom',
             name: obj.subtype || (isBackground ? 'Background Image' : 'Image'),
-            // Background images always fill the full CD display area
-            x: isBackground ? 0 : Math.round(obj.left / SCALE),
-            y: isBackground ? 0 : Math.round(obj.top / SCALE),
-            width: isBackground ? DISPLAY_SIZE : Math.round(obj.width / SCALE),
-            height: isBackground ? DISPLAY_SIZE : Math.round(obj.height / SCALE),
-            src: displaySrc,     // full URL — used by canvas <img> for display
-            source: relativeSrc, // relative path — stored back to backend on save
+            x: isBackground ? 0 : Math.round(obj.left * scaleFactor),
+            y: isBackground ? 0 : Math.round(obj.top * scaleFactor),
+            width: isBackground ? DISPLAY_SIZE : widthPx,
+            height: isBackground ? DISPLAY_SIZE : Math.round(obj.height * scaleFactor),
+            src: displaySrc,
+            source: relativeSrc,
             rotation: 0,
             opacity: 1,
             locked: false,
@@ -110,19 +181,40 @@ function specToElement(obj) {
         };
     }
 
+    if (obj.type === 'circle') {
+        const cxPx = Math.round((obj.centerXmm ?? 60) * scaleFactor);
+        const cyPx = Math.round((obj.centerYmm ?? 60) * scaleFactor);
+        const rPx = Math.round((obj.radiusMm ?? 22) * scaleFactor);
+        return {
+            id: String(obj.id),
+            type: 'circle',
+            name: 'Circle',
+            x: cxPx - rPx,
+            y: cyPx - rPx,
+            width: rPx * 2,
+            height: rPx * 2,
+            lineWidth: Math.round((obj.lineWidthMm || 0.1) * scaleFactor),
+            color: obj.color || '#000000',
+            zIndex: obj.zIndex ?? 1,
+            visible: true,
+            locked: false,
+        };
+    }
+
     // text / dynamic
     return {
         id: String(obj.id),
         type: 'dynamic',
         name: obj.name || 'Text',
-        x: Math.round(obj.left / SCALE),
-        y: Math.round(obj.top / SCALE),
-        width: Math.round((obj.width || 400) / SCALE),
+        x: Math.round(obj.left * scaleFactor),
+        y: Math.round(obj.top * scaleFactor),
+        width: Math.round((obj.width || 60) * scaleFactor),
+        height: Math.round((obj.height || 10) * scaleFactor),
         rotation: 0,
         opacity: 1,
         content: obj.text || '',
         fontFamily: obj.fontFamily || 'Arial',
-        fontSize: Math.round((obj.fontSize || 28) / SCALE),
+        fontSize: Math.round((obj.fontSize || 3.4) * scaleFactor),
         fontWeight: obj.bold ? '700' : '400',
         fontStyle: obj.italic ? 'italic' : 'normal',
         color: obj.color || '#000000',
@@ -136,43 +228,54 @@ function specToElement(obj) {
 }
 
 /**
- * Convert a frontend element → backend object (1200-px space, spec schema).
- *
- * Frontend types → API types:
- *   "image"   → { type: "image", source, left, top, width, height, zIndex }
- *   "label"   → { type: "text",  text (custom string), ...font props }
- *   "dynamic" → { type: "text",  text ({{Placeholder}}), ...font props }
+ * Convert a frontend element → backend spec object (mm space schema).
  */
 function elementToSpec(el, idCounter) {
+    const roundMm = (val) => Math.round(val * 100) / 100;
+
     if (el.type === 'image') {
         return {
             id: idCounter,
             type: 'image',
             source: el.source || el.src || '',
-            left: Math.round((el.x || 0) * SCALE),
-            top: Math.round((el.y || 0) * SCALE),
-            width: Math.round((el.width || 120) * SCALE),
-            height: Math.round((el.height || 120) * SCALE),
+            left: roundMm((el.x || 0) / MM_SCALE),
+            top: roundMm((el.y || 0) / MM_SCALE),
+            width: roundMm((el.width || 120) / MM_SCALE),
+            height: roundMm((el.height || 120) / MM_SCALE),
             zIndex: el.zIndex ?? 0,
         };
     }
 
+    if (el.type === 'circle') {
+        const cxPx = (el.x || 0) + (el.width || 0) / 2;
+        const cyPx = (el.y || 0) + (el.height || 0) / 2;
+        const rPx = (el.width || 44) / 2;
+        return {
+            id: idCounter,
+            type: 'circle',
+            centerXmm: roundMm(cxPx / MM_SCALE),
+            centerYmm: roundMm(cyPx / MM_SCALE),
+            radiusMm: roundMm(rPx / MM_SCALE),
+            lineWidthMm: roundMm((el.lineWidth || 0.3) / MM_SCALE),
+            color: el.color || '#000000',
+            zIndex: el.zIndex ?? 1,
+        };
+    }
+
     // Both "label" (custom text) and "dynamic" (DICOM placeholder) → type: "text"
-    const fontSizePx = el.fontSize || 14;
+    const fontSizePx = el.fontSize || 10.2;
     const heightPx = el.height || Math.round(fontSizePx * 1.4);
     return {
         id: idCounter,
         type: 'text',
         text: el.content || '',
-        left: Math.round((el.x || 0) * SCALE),
-        top: Math.round((el.y || 0) * SCALE),
-        width: Math.round((el.width || 200) * SCALE),
-        height: Math.round(heightPx * SCALE),
-        fontSize: Math.round(fontSizePx * SCALE),
-        fontFamily: el.fontFamily || 'Arial',
+        left: roundMm((el.x || 0) / MM_SCALE),
+        top: roundMm((el.y || 0) / MM_SCALE),
+        width: roundMm((el.width || 60) / MM_SCALE),
+        height: roundMm(heightPx / MM_SCALE),
+        fontSize: roundMm(fontSizePx / MM_SCALE),
         color: el.color || '#000000',
         bold: el.fontWeight === '700' || el.fontWeight === '800' || el.fontWeight === 'bold',
-        italic: el.fontStyle === 'italic',
         align: el.textAlign || 'left',
         zIndex: el.zIndex ?? 2,
     };
@@ -180,27 +283,25 @@ function elementToSpec(el, idCounter) {
 
 /**
  * Build the full template payload to POST/PUT to backend.
- * Serializes all canvas elements into the 1200×1200 spec schema.
- *
- * Payload shape (matches API contract):
- *   {
- *     name,
- *     description,
- *     jsonDefinition: { width: 1200, height: 1200, objects: [...] },
- *     backgroundImage: "",
- *     isDefault: false
- *   }
- *
- * Each object inside jsonDefinition is one of:
- *   { id, type:"image", source, left, top, width, height, zIndex }
- *   { id, type:"text",  text, left, top, width, height, fontSize,
- *     fontFamily, color, bold, italic, align, zIndex }
+ * Includes static disc dimensions, unit, disc details, static ring QR codes (IDs 2-8),
+ * and dynamic canvas objects starting at ID 9.
  */
 function buildTemplatePayload(name, elements, { description = '', backgroundImage = '', isDefault = false, createdAt = null } = {}) {
+    const dynamicElements = elements.filter(el => el.type !== 'qrcode');
+    const dynamicObjects = dynamicElements.map((el, i) => elementToSpec(el, i + 9));
+
     const jsonDefinition = {
-        // width: SPEC_SIZE,
-        // height: SPEC_SIZE,
-        objects: elements.map((el, i) => elementToSpec(el, i + 1)),
+        width: 120,
+        height: 120,
+        unit: 'mm',
+        disc: {
+            diameterMm: 120,
+            holeDiameterMm: 15,
+        },
+        objects: [
+            ...STATIC_OBJECTS,
+            ...dynamicObjects,
+        ],
     };
 
     const payload = {
@@ -211,23 +312,19 @@ function buildTemplatePayload(name, elements, { description = '', backgroundImag
         isDefault,
         ...(createdAt ? { createdAt } : {}),
     };
-    // ── Debug: inspect the exact JSON being sent to the API ──────────────────
+
     console.log('[CDDesignStudio] Template payload to submit:', JSON.stringify(payload, null, 2));
     return payload;
 }
 
 /**
  * Restore elements from a backend template.
- * Handles:
- *   - jsonDefinition as a plain object  { width, height, objects }
- *   - jsonDefinition as a JSON string   "{\"width\":1200,...}"
- *   - Legacy: template.objects array directly on the template
+ * Handles jsonDefinition with mm units or legacy 1200px format.
  */
 export function restoreElementsFromTemplate(template) {
     if (template?.jsonDefinition) {
         let def = template.jsonDefinition;
 
-        // If it's a string, parse it to an object first
         if (typeof def === 'string') {
             try {
                 def = JSON.parse(def);
@@ -237,15 +334,18 @@ export function restoreElementsFromTemplate(template) {
             }
         }
 
-        // def is now an object (or null if parse failed)
         if (def?.objects?.length) {
-            return def.objects.map(specToElement);
+            const isMm = def.unit === 'mm' || def.width === 120;
+            return def.objects
+                .map(obj => specToElement(obj, isMm))
+                .filter(Boolean);
         }
     }
 
-    // Legacy fallback: objects directly on template
     if (!template?.objects?.length) return [];
-    return template.objects.map(specToElement);
+    return template.objects
+        .map(obj => specToElement(obj, false))
+        .filter(Boolean);
 }
 
 // ─── History helpers ──────────────────────────────────────────────────────────
@@ -407,11 +507,20 @@ function CDDesignStudio({ onBack }) {
                 .map(e => ({ ...e, zIndex: Math.max(1, (e.zIndex || 0) + 1) }));
         }
         const zIndex = newEl.zIndex !== undefined ? newEl.zIndex : currentElements.length;
-        const el = { ...newEl, id: genId(), zIndex };
+        let el = { ...newEl, id: genId(), zIndex };
+
+        if (el.subtype !== 'background') {
+            const adjusted = adjustIfOverlappingBarcode(el, discConfig, dicomData);
+            if (adjusted.moved) {
+                el.x = adjusted.x;
+                el.y = adjusted.y;
+            }
+        }
+
         currentElements.push(el);
         updateElements(currentElements);
         setSelectedIds([el.id]);
-    }, [elements, updateElements]);
+    }, [elements, discConfig, dicomData, updateElements]);
 
     const deleteSelected = useCallback(() => {
         if (selectedIds.length === 0) return;
@@ -479,17 +588,26 @@ function CDDesignStudio({ onBack }) {
                 createdAt: !isNew ? (activeTemplate?.createdAt || null) : null,
             });
 
-            let saved;
+            let resData;
             if (!isNew) {
-                saved = await updateTemplate(activeTemplate.id, payload);
-                setTemplates(prev => prev.map(t => t.id === saved.id ? saved : t));
+                resData = await updateTemplate(activeTemplate.id, payload);
                 toast.success('Template updated!');
             } else {
-                saved = await createTemplate(payload);
-                setTemplates(prev => [...prev, saved]);
+                resData = await createTemplate(payload);
                 toast.success('Template saved!');
             }
-            setActiveTemplate(saved);
+            const savedObj = (resData && typeof resData === 'object' && resData.id)
+                ? resData
+                : (resData?.data || resData?.template || { ...payload, id: activeTemplate?.id });
+
+            setTemplates(prev => {
+                const exists = prev.some(t => t.id === savedObj.id);
+                if (exists) {
+                    return prev.map(t => t.id === savedObj.id ? savedObj : t);
+                }
+                return [...prev, savedObj];
+            });
+            setActiveTemplate(savedObj);
         } catch (err) {
             console.error('Save template failed:', err);
             toast.error(err?.response?.data?.message || err.message || 'Save failed');

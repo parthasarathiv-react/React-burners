@@ -597,9 +597,10 @@
 /* ── Selection Handles ── */
 .cds-label-element {
     min-height: 24px;
-    padding: 3px 8px;
+    padding: 3px 9px; /* 3mm (9px) left and right space */
     border: 1px solid transparent;
     border-radius: 3px;
+    box-sizing: border-box;
 }
 
 .cds-label-element--selected {

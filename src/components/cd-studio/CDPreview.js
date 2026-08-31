@@ -1,5 +1,6 @@
 import React from 'react';
 import { resolveDicomPlaceholders } from './CDDesignStudio';
+import DefaultCDQRCodes from './DefaultCDQRCodes';
 
 const CD_SIZE = 360;
 
@@ -78,7 +79,11 @@ const CDPreview = ({ elements = [], discConfig, dicomData, zoom = 1 }) => {
                         key={el.id}
                         style={{
                             ...commonStyle,
-                            width: el.width,
+                            width: 'fit-content',
+                            minWidth: '40px',
+                            padding: '3px 9px',
+                            boxSizing: 'border-box',
+                            transformOrigin: 'center center',
                             fontFamily: el.fontFamily || 'Bai Jamjuree',
                             fontSize: el.fontSize || 14,
                             fontWeight: el.fontWeight || '400',
@@ -150,6 +155,9 @@ const CDPreview = ({ elements = [], discConfig, dicomData, zoom = 1 }) => {
                 <svg
                     style={{ position: 'absolute', inset: 0, width: CD_SIZE, height: CD_SIZE, pointerEvents: 'none', zIndex: 9000 }}
                 >
+                    {/* Default 7 QR Codes Ring (1cm from center hub circle) */}
+                    <DefaultCDQRCodes discConfig={discConfig} />
+
                     <circle cx={CD_SIZE / 2} cy={CD_SIZE / 2} r={hubR}
                         fill="#f0f0f4" stroke="rgba(0,0,0,0.1)" strokeWidth="1" />
                     <circle cx={CD_SIZE / 2} cy={CD_SIZE / 2} r={8}

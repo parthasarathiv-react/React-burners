@@ -16,6 +16,7 @@ import { Flame, Disc, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import CDPreview from '../cd-studio/CDPreview';
 import api from '../../lib/api';
+import { startEburn } from '../../utils/templateApi';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,7 @@ function Dashboard({ theme, onThemeChange }) {
   const [selectedStudyIds, setSelectedStudyIds] = useState([]);
   const [burnModalOpen, setBurnModalOpen] = useState(false);
   const [burnTemplate, setBurnTemplate] = useState(null);
+  const [executingBurn, setExecutingBurn] = useState(false);
   const burnPreviewRef = useRef(null);
 
   const [deleteStudyConfirmId, setDeleteStudyConfirmId] = useState(null);
@@ -477,14 +479,45 @@ function Dashboard({ theme, onThemeChange }) {
 
                 <div className="pt-2">
                   <Button
+                    disabled={executingBurn}
                     onClick={async () => {
-                      await handleDownloadImage();
-                      toast.success('Burn process initiated successfully and label downloaded!');
-                      setBurnModalOpen(false);
+                      if (!selectedStudyIds.length) {
+                        toast.warning('No study selected for burning.');
+                        return;
+                      }
+                      setExecutingBurn(true);
+                      try {
+                        for (const studyId of selectedStudyIds) {
+                          const numericStudyId = Number(studyId);
+                          const numericTemplateId = Number(burnTemplate?.id || 0);
+
+                          console.log(`[Dashboard] Executing burn API: studyID=${numericStudyId}, templateId=${numericTemplateId}`);
+                          const res = await startEburn({
+                            studyID: numericStudyId,
+                            templateId: numericTemplateId,
+                          });
+
+                          if (res?.message) {
+                            toast.success(res.message);
+                          } else if (res?.jobId) {
+                            toast.success(`Burn job #${res.jobId} started successfully.`);
+                          } else {
+                            toast.success('Burn process started successfully.');
+                          }
+                        }
+
+                        await handleDownloadImage();
+                        setBurnModalOpen(false);
+                      } catch (err) {
+                        console.error('Failed to execute burn job:', err);
+                        toast.error(err?.response?.data?.message || err.message || 'Failed to start burn job on server.');
+                      } finally {
+                        setExecutingBurn(false);
+                      }
                     }}
-                    className="w-full py-5 rounded-2xl bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 bg-[length:200%_auto] animate-gradient-x text-white font-black uppercase tracking-[0.25em] shadow-[0_10px_40px_rgba(234,88,12,0.4)] hover:shadow-[0_15px_50px_rgba(234,88,12,0.5)] hover:-translate-y-1 active:translate-y-0 transition-all duration-300"
+                    className="w-full py-5 rounded-2xl bg-gradient-to-r from-orange-600 via-red-600 to-orange-600 bg-[length:200%_auto] animate-gradient-x text-white font-black uppercase tracking-[0.25em] shadow-[0_10px_40px_rgba(234,88,12,0.4)] hover:shadow-[0_15px_50px_rgba(234,88,12,0.5)] hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50"
                   >
-                    Confirm & Execute Burn
+                    {executingBurn ? 'Executing Burn...' : 'Confirm & Execute Burn'}
                   </Button>
                 </div>
               </div>
