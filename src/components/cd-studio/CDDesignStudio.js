@@ -202,13 +202,27 @@ function specToElement(obj, isMm = true) {
     }
 
     // text / dynamic
+    const objWidth = obj.width || 60;
+    const objAlign = obj.align || 'center';
+    let objLeft = obj.left ?? 0;
+
+    // Enforce formula: left + width/2 == diameterMm/2 (60 mm)
+    // For center-aligned text, calculate objLeft so left + width/2 == 60mm
+    if (objAlign === 'center') {
+        objLeft = 60 - (objWidth / 2);
+    }
+
+    const isArcMode = !!(obj.arcMode || obj.isArcMode);
+    const arcAngle = obj.arcAngle ?? 0;
+    const arcRadiusPx = obj.arcRadiusMm ? Math.round(obj.arcRadiusMm * scaleFactor) : (obj.arcRadius || 120);
+
     return {
         id: String(obj.id),
         type: 'dynamic',
         name: obj.name || 'Text',
-        x: Math.round(obj.left * scaleFactor),
+        x: Math.round(objLeft * scaleFactor),
         y: Math.round(obj.top * scaleFactor),
-        width: Math.round((obj.width || 60) * scaleFactor),
+        width: Math.round(objWidth * scaleFactor),
         height: Math.round((obj.height || 10) * scaleFactor),
         rotation: 0,
         opacity: 1,
@@ -218,12 +232,15 @@ function specToElement(obj, isMm = true) {
         fontWeight: obj.bold ? '700' : '400',
         fontStyle: obj.italic ? 'italic' : 'normal',
         color: obj.color || '#000000',
-        textAlign: obj.align || 'left',
+        textAlign: objAlign,
         letterSpacing: 0,
         lineHeight: 1.4,
         locked: false,
         visible: true,
         zIndex: obj.zIndex ?? 2,
+        arcMode: isArcMode,
+        arcAngle: arcAngle,
+        arcRadius: arcRadiusPx,
     };
 }
 
@@ -265,20 +282,37 @@ function elementToSpec(el, idCounter) {
     // Both "label" (custom text) and "dynamic" (DICOM placeholder) → type: "text"
     const fontSizePx = el.fontSize || 10.2;
     const heightPx = el.height || Math.round(fontSizePx * 1.4);
-    return {
+    const widthMm = roundMm((el.width || 60) / MM_SCALE);
+    let leftMm = roundMm((el.x || 0) / MM_SCALE);
+
+    // Enforce formula: left + width/2 == diameterMm/2 (60 mm) for centered text
+    if (el.textAlign === 'center' || !el.textAlign) {
+        leftMm = roundMm(60 - (widthMm / 2));
+    }
+
+    const specObj = {
         id: idCounter,
         type: 'text',
         text: el.content || '',
-        left: roundMm((el.x || 0) / MM_SCALE),
+        left: leftMm,
         top: roundMm((el.y || 0) / MM_SCALE),
-        width: roundMm((el.width || 60) / MM_SCALE),
+        width: widthMm,
         height: roundMm(heightPx / MM_SCALE),
         fontSize: roundMm(fontSizePx / MM_SCALE),
         color: el.color || '#000000',
         bold: el.fontWeight === '700' || el.fontWeight === '800' || el.fontWeight === 'bold',
-        align: el.textAlign || 'left',
+        align: el.textAlign || 'center',
         zIndex: el.zIndex ?? 2,
     };
+
+    if (el.arcMode) {
+        specObj.arcMode = true;
+        specObj.arcAngle = el.arcAngle || 0;
+        specObj.arcRadius = el.arcRadius || 120;
+        specObj.arcRadiusMm = roundMm((el.arcRadius || 120) / MM_SCALE);
+    }
+
+    return specObj;
 }
 
 /**
@@ -286,7 +320,7 @@ function elementToSpec(el, idCounter) {
  * Includes static disc dimensions, unit, disc details, static ring QR codes (IDs 2-8),
  * and dynamic canvas objects starting at ID 9.
  */
-function buildTemplatePayload(name, elements, { description = '', backgroundImage = '', isDefault = false, createdAt = null } = {}) {
+function buildTemplatePayload(name, elements, { description = '', backgroundImage = '', isDefault = false } = {}) {
     const dynamicElements = elements.filter(el => el.type !== 'qrcode');
     const dynamicObjects = dynamicElements.map((el, i) => elementToSpec(el, i + 9));
 
@@ -310,7 +344,6 @@ function buildTemplatePayload(name, elements, { description = '', backgroundImag
         jsonDefinition,
         backgroundImage,
         isDefault,
-        ...(createdAt ? { createdAt } : {}),
     };
 
     console.log('[CDDesignStudio] Template payload to submit:', JSON.stringify(payload, null, 2));
@@ -585,7 +618,6 @@ function CDDesignStudio({ onBack }) {
                 description: description.trim(),
                 backgroundImage: activeTemplate?.backgroundImage || '',
                 isDefault: activeTemplate?.isDefault || false,
-                createdAt: !isNew ? (activeTemplate?.createdAt || null) : null,
             });
 
             let resData;

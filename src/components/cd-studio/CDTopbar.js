@@ -7,12 +7,11 @@ import { useState } from 'react';
 
 function CDTopbar({
     onBack, onUndo, onRedo, canUndo, canRedo,
-    zoom, onZoomChange,
+    zoom, onZoomChange, showGrid, onToggleGrid,
     onSave, onSaveAs, onNew, onDeleteTemplate,
     onExportTemplate, onImportTemplate,
     templates, activeTemplate, onLoadTemplate,
     loadingTemplates, savingTemplate,
-
 }) {
     const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
     const zoomPct = Math.round(zoom * 100);
@@ -75,7 +74,15 @@ function CDTopbar({
 
                 <div className="cds-tb-divider" />
 
-
+                <button
+                    className={`cds-tb-btn ${showGrid ? 'cds-tb-btn--active' : ''}`}
+                    onClick={onToggleGrid}
+                    title="Toggle MM Center Axis Rulers"
+                    style={showGrid ? { background: 'rgba(37, 99, 235, 0.25)', color: '#60a5fa', borderColor: 'rgba(37, 99, 235, 0.5)' } : {}}
+                >
+                    <Grid3X3 size={16} />
+                    <span>MM Axis</span>
+                </button>
             </div>
 
             {/* Right Group */}

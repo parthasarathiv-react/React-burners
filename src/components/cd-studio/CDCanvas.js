@@ -3,6 +3,7 @@ import { resolveDicomPlaceholders, SAMPLE_DICOM } from './CDDesignStudio';
 import { Copy, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import DefaultCDQRCodes from './DefaultCDQRCodes';
+import CDCenterMMAxis from './CDCenterMMAxis';
 
 const CD_SIZE = 360;
 
@@ -95,7 +96,7 @@ export function adjustIfOverlappingBarcode(el, discConfig, dicomData) {
 
 function CDCanvas({
     elements, selectedIds, onSelect, onUpdateElements,
-    zoom, onZoomChange, showGrid, dicomData, discConfig,
+    zoom, onZoomChange, showGrid = true, dicomData, discConfig,
     onDuplicate, onDelete, onBringForward, onSendBackward,
 }) {
     const workspaceRef = useRef(null);
@@ -413,21 +414,41 @@ function CDCanvas({
                     </svg>
                 );
             } else {
+                const { width: contentWidth } = getElementDimensions(el, dicomData);
+                const elWidth = contentWidth;
+                
+                // Preserve exact center position based on text content width
+                const currentWidth = el.width || contentWidth;
+                const currentCenterX = el.x + (currentWidth / 2);
+                let renderX = el.x;
+                
+                if (el.textAlign === 'center' || !el.textAlign) {
+                    if (Math.abs(currentCenterX - (CD_SIZE / 2)) < 15) {
+                        renderX = (CD_SIZE / 2) - (contentWidth / 2);
+                    } else {
+                        renderX = currentCenterX - (contentWidth / 2);
+                    }
+                }
+
                 content = (
                     <div
                         className={`cds-label-element ${isSelected ? 'cds-label-element--selected' : ''}`}
                         style={{
                             ...commonStyle,
-                            width: 'fit-content',
+                            left: renderX,
+                            width: `${elWidth}px`,
                             minWidth: '40px',
                             padding: '3px 9px',
                             boxSizing: 'border-box',
                             transformOrigin: 'center center',
-                            fontFamily: el.fontFamily || 'Bai Jamjuree',
+                            fontFamily: el.fontFamily || 'Arial, sans-serif',
                             fontSize: el.fontSize || 14,
                             fontWeight: el.fontWeight || '400',
                             color: el.color || '#000000',
                             textAlign: el.textAlign || 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: (el.textAlign === 'left') ? 'flex-start' : ((el.textAlign === 'right') ? 'flex-end' : 'center'),
                             letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
                             lineHeight: el.lineHeight || 1.4,
                             backgroundColor: el.bgColor || undefined,
@@ -564,6 +585,9 @@ function CDCanvas({
                     <svg
                         style={{ position: 'absolute', inset: 0, width: CD_SIZE, height: CD_SIZE, pointerEvents: 'none', zIndex: 9000 }}
                     >
+                        {/* Center MM Axis Rulers (Left to Right & Top to Bottom) */}
+                        <CDCenterMMAxis showGrid={showGrid} />
+
                         {/* Default 7 QR Codes Ring (1cm from center hub circle) */}
                         <DefaultCDQRCodes discConfig={discConfig} />
 
