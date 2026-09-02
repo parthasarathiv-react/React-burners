@@ -15,6 +15,7 @@ import { DownloadProvider } from '../../context/DownloadContext';
 import { Flame, Disc, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import CDPreview from '../cd-studio/CDPreview';
+import { restoreElementsFromTemplate } from '../cd-studio/CDDesignStudio';
 import api from '../../lib/api';
 import { startEburn } from '../../utils/templateApi';
 import {
@@ -421,10 +422,23 @@ function Dashboard({ theme, onThemeChange }) {
                       StudyInstanceUID: selectedStudy.studyInstanceUid,
                     } : {};
 
+                    // Resolve elements: use pre-processed elements if available,
+                    // otherwise restore from jsonDefinition at render time
+                    const resolvedElements = (burnTemplate?.elements?.length > 0)
+                      ? burnTemplate.elements
+                      : (burnTemplate ? restoreElementsFromTemplate(burnTemplate) : []);
+
+                    const resolvedDiscConfig = burnTemplate?.discConfig || {
+                      outerRadius: 60,
+                      printableRadius: 58,
+                      safeRadius: 56,
+                      innerRadius: 11,
+                    };
+
                     return (
                       <CDPreview
-                        elements={burnTemplate?.elements || []}
-                        discConfig={burnTemplate?.discConfig}
+                        elements={resolvedElements}
+                        discConfig={resolvedDiscConfig}
                         dicomData={normalizedDicomData}
                         zoom={1}
                       />

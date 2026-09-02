@@ -82,16 +82,7 @@ function CDPropertiesSidebar({ element, onUpdate }) {
                     <PropRow label="Y">
                         <NumberInput value={element.y} onChange={v => onUpdate({ y: v })} />
                     </PropRow>
-                    {element.width !== undefined && (
-                        <PropRow label="W">
-                            <NumberInput value={element.width} onChange={v => onUpdate({ width: v })} min={10} />
-                        </PropRow>
-                    )}
-                    {element.height !== undefined && (
-                        <PropRow label="H">
-                            <NumberInput value={element.height} onChange={v => onUpdate({ height: v })} min={1} />
-                        </PropRow>
-                    )}
+
                 </div>
 
                 {/* Simple Circle Label Toggle - one-click to enable */}

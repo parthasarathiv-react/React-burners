@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Disc, Trash2, Layout, Loader2 } from 'lucide-react';
+import { Check, Disc, Trash2, Layout, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { getTemplates, updateTemplate, deleteTemplate } from '../../utils/templateApi';
+import { getTemplates, getTemplate, updateTemplate, deleteTemplate } from '../../utils/templateApi';
 
 const BravoSetting = () => {
     const [templates, setTemplates] = useState([]);
@@ -43,21 +43,23 @@ const BravoSetting = () => {
     const handleSetActive = async (targetTemplate) => {
         setUpdatingId(targetTemplate.id);
         try {
-            let defObj = targetTemplate.jsonDefinition;
+            const fullTemplate = await getTemplate(targetTemplate.id).catch(() => targetTemplate);
+            const templateToUse = fullTemplate || targetTemplate;
+
+            let defObj = templateToUse.jsonDefinition;
             if (typeof defObj === 'string') {
                 try { defObj = JSON.parse(defObj); } catch (_) {}
             }
-
+            // Exact same fields as CDDesignStudio buildTemplatePayload — only isDefault changes
             const payload = {
-                name: targetTemplate.name,
-                description: targetTemplate.description || '',
-                jsonDefinition: defObj || { objects: targetTemplate.objects || [] },
-                backgroundImage: targetTemplate.backgroundImage || '',
+                name: templateToUse.name,
+                description: templateToUse.description || '',
+                jsonDefinition: defObj,
+                backgroundImage: templateToUse.backgroundImage || '',
                 isDefault: true,
             };
-
             await updateTemplate(targetTemplate.id, payload);
-            toast.success(`"${targetTemplate.name}" is now set as the default active template.`);
+            toast.success(`"${templateToUse.name}" is now set as the default active template.`);
             await loadTemplates();
         } catch (e) {
             console.error('Failed to set active template', e);
@@ -66,6 +68,36 @@ const BravoSetting = () => {
             setUpdatingId(null);
         }
     };
+
+    const handleSetInactive = async (targetTemplate) => {
+        setUpdatingId(targetTemplate.id);
+        try {
+            const fullTemplate = await getTemplate(targetTemplate.id).catch(() => targetTemplate);
+            const templateToUse = fullTemplate || targetTemplate;
+
+            let defObj = templateToUse.jsonDefinition;
+            if (typeof defObj === 'string') {
+                try { defObj = JSON.parse(defObj); } catch (_) {}
+            }
+            // Exact same fields as CDDesignStudio buildTemplatePayload — only isDefault changes
+            const payload = {
+                name: templateToUse.name,
+                description: templateToUse.description || '',
+                jsonDefinition: defObj,
+                backgroundImage: templateToUse.backgroundImage || '',
+                isDefault: false,
+            };
+            await updateTemplate(targetTemplate.id, payload);
+            toast.success(`"${templateToUse.name}" has been deactivated.`);
+            await loadTemplates();
+        } catch (e) {
+            console.error('Failed to deactivate template', e);
+            toast.error(e?.response?.data?.message || e.message || 'Failed to deactivate template on server');
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
 
     const handleDeleteTemplate = (id) => {
         setDeleteConfirmId(id);
@@ -110,8 +142,10 @@ const BravoSetting = () => {
                             <p className="text-xs text-ot-text-muted/60 mt-1">Create templates in the CD Design Studio first.</p>
                         </div>
                     ) : (
-                        templates.map((template) => {
+                templates.map((template) => {
                             const isDefault = !!template.isDefault;
+                            const hasActiveTemplate = templates.some(t => t.isDefault);
+                            const isAnotherActive = hasActiveTemplate && !isDefault;
                             let layersCount = 0;
                             if (template.jsonDefinition) {
                                 let def = template.jsonDefinition;
@@ -166,19 +200,48 @@ const BravoSetting = () => {
 
                                     <div className="flex items-center gap-2">
                                         {isDefault ? (
-                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold w-full justify-center">
-                                                <Check size={14} /> Active for Burning
-                                            </div>
-                                        ) : (
                                             <Button
                                                 variant="outline"
                                                 size="sm"
                                                 disabled={updatingId === template.id}
-                                                onClick={() => handleSetActive(template)}
-                                                className="w-full py-1.5 rounded-lg bg-ot-action-top/10 hover:bg-ot-action-top/20 border border-ot-action-top/20 text-ot-action-top text-xs font-bold transition-all"
+                                                onClick={() => handleSetInactive(template)}
+                                                className="w-full py-1.5 rounded-lg bg-emerald-500/20 hover:bg-red-500/20 border border-emerald-500/30 hover:border-red-500/30 text-emerald-400 hover:text-red-400 text-xs font-bold transition-all"
+                                                title="Click to deactivate"
                                             >
-                                                {updatingId === template.id ? 'Setting Active...' : 'Set as Active'}
+                                                {updatingId === template.id ? 'Updating...' : <><Check size={14} /> Active for Burning</>}
                                             </Button>
+                                        ) : (
+                                            <div className="flex items-center gap-2 w-full">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={updatingId === template.id || isAnotherActive}
+                                                    onClick={() => !isAnotherActive && handleSetActive(template)}
+                                                    className={cn(
+                                                        "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                                        isAnotherActive
+                                                            ? "bg-white/5 border border-white/10 text-white/20 cursor-not-allowed opacity-50"
+                                                            : "bg-ot-action-top/10 hover:bg-ot-action-top/20 border border-ot-action-top/20 text-ot-action-top"
+                                                    )}
+                                                >
+                                                    {updatingId === template.id ? 'Setting Active...' : 'Set as Active'}
+                                                </Button>
+
+                                                {/* Warning icon with tooltip when another is active */}
+                                                {isAnotherActive && (
+                                                    <div className="relative group/warn shrink-0">
+                                                        <AlertTriangle
+                                                            size={16}
+                                                            className="text-amber-400/70 cursor-default"
+                                                        />
+                                                        {/* Tooltip */}
+                                                        <div className="absolute bottom-full right-0 mb-2 w-48 px-3 py-2 rounded-lg bg-[#1a1f2e] border border-amber-400/20 text-amber-300 text-[10px] font-semibold leading-snug shadow-xl opacity-0 pointer-events-none group-hover/warn:opacity-100 transition-opacity duration-200 z-50 whitespace-normal text-center">
+                                                            Only one template can be active at a time. Deactivate the current one first.
+                                                            <div className="absolute top-full right-3 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-amber-400/20" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { resolveDicomPlaceholders } from './CDDesignStudio';
+import { getElementDimensions } from './CDCanvas';
 import DefaultCDQRCodes from './DefaultCDQRCodes';
 
 const CD_SIZE = 360;
@@ -74,12 +75,28 @@ const CDPreview = ({ elements = [], discConfig, dicomData, zoom = 1 }) => {
                     </svg>
                 );
             } else {
+                const { width: contentWidth } = getElementDimensions(el, dicomData);
+
+                // Same center-align logic as CDCanvas
+                const currentWidth = el.width || contentWidth;
+                const currentCenterX = el.x + (currentWidth / 2);
+                let renderX = el.x;
+
+                if (el.textAlign === 'center' || !el.textAlign) {
+                    if (Math.abs(currentCenterX - (CD_SIZE / 2)) < 15) {
+                        renderX = (CD_SIZE / 2) - (contentWidth / 2);
+                    } else {
+                        renderX = currentCenterX - (contentWidth / 2);
+                    }
+                }
+
                 return (
                     <div
                         key={el.id}
                         style={{
                             ...commonStyle,
-                            width: 'fit-content',
+                            left: renderX,
+                            width: `${contentWidth}px`,
                             minWidth: '40px',
                             padding: '3px 9px',
                             boxSizing: 'border-box',
@@ -89,6 +106,9 @@ const CDPreview = ({ elements = [], discConfig, dicomData, zoom = 1 }) => {
                             fontWeight: el.fontWeight || '400',
                             color: el.color || '#000000',
                             textAlign: el.textAlign || 'center',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: el.textAlign === 'left' ? 'flex-start' : (el.textAlign === 'right' ? 'flex-end' : 'center'),
                             letterSpacing: el.letterSpacing ? `${el.letterSpacing}px` : undefined,
                             lineHeight: el.lineHeight || 1.4,
                             whiteSpace: 'nowrap',

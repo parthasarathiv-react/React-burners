@@ -204,13 +204,7 @@ function specToElement(obj, isMm = true) {
     // text / dynamic
     const objWidth = obj.width || 60;
     const objAlign = obj.align || 'center';
-    let objLeft = obj.left ?? 0;
-
-    // Enforce formula: left + width/2 == diameterMm/2 (60 mm)
-    // For center-aligned text, calculate objLeft so left + width/2 == 60mm
-    if (objAlign === 'center') {
-        objLeft = 60 - (objWidth / 2);
-    }
+    const objLeft = obj.left ?? 0;
 
     const isArcMode = !!(obj.arcMode || obj.isArcMode);
     const arcAngle = obj.arcAngle ?? 0;
@@ -279,16 +273,10 @@ function elementToSpec(el, idCounter) {
         };
     }
 
-    // Both "label" (custom text) and "dynamic" (DICOM placeholder) → type: "text"
     const fontSizePx = el.fontSize || 10.2;
     const heightPx = el.height || Math.round(fontSizePx * 1.4);
     const widthMm = roundMm((el.width || 60) / MM_SCALE);
-    let leftMm = roundMm((el.x || 0) / MM_SCALE);
-
-    // Enforce formula: left + width/2 == diameterMm/2 (60 mm) for centered text
-    if (el.textAlign === 'center' || !el.textAlign) {
-        leftMm = roundMm(60 - (widthMm / 2));
-    }
+    const leftMm = roundMm((el.x || 0) / MM_SCALE);
 
     const specObj = {
         id: idCounter,
